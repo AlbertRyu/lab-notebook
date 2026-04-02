@@ -803,8 +803,16 @@
         position: relative;
         overflow: hidden;
         background:
-          radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.07), transparent 35%),
-          radial-gradient(circle at 80% 15%, rgba(245, 158, 11, 0.06), transparent 32%),
+          radial-gradient(
+            circle at 20% 20%,
+            rgba(37, 99, 235, 0.07),
+            transparent 35%
+          ),
+          radial-gradient(
+            circle at 80% 15%,
+            rgba(245, 158, 11, 0.06),
+            transparent 32%
+          ),
           linear-gradient(180deg, var(--bg-panel), var(--bg));
       }
       #graph-canvas canvas {
@@ -1810,7 +1818,11 @@
           if (!_graphLoaded) graphInit();
           else graphStartAnimation();
           requestAnimationFrame(() => {
-            if (document.getElementById("page-graph")?.classList.contains("active")) {
+            if (
+              document
+                .getElementById("page-graph")
+                ?.classList.contains("active")
+            ) {
               graphResizeCanvas();
               graphDraw();
             }
@@ -2517,7 +2529,12 @@
           const wrap = document.getElementById("graph-canvas");
           if (wrap) {
             graph.resizeObserver = new ResizeObserver(() => {
-              if (!document.getElementById("page-graph")?.classList.contains("active")) return;
+              if (
+                !document
+                  .getElementById("page-graph")
+                  ?.classList.contains("active")
+              )
+                return;
               graphResizeCanvas();
               graphDraw();
             });
@@ -2531,7 +2548,10 @@
         const wrap = document.getElementById("graph-canvas");
         if (!wrap) return { width: 0, height: 0 };
         const rect = wrap.getBoundingClientRect();
-        return { width: Math.max(1, rect.width), height: Math.max(1, rect.height) };
+        return {
+          width: Math.max(1, rect.width),
+          height: Math.max(1, rect.height),
+        };
       }
 
       function graphEnsureCanvas() {
@@ -2593,7 +2613,8 @@
 
       function graphNodeLabel(node) {
         if (node.kind === "sample") return node.label || `Sample #${node.id}`;
-        if (node.kind === "experiment") return node.label || `Measurement #${node.id}`;
+        if (node.kind === "experiment")
+          return node.label || `Measurement #${node.id}`;
         return node.label || `Note #${node.id}`;
       }
 
@@ -2616,10 +2637,14 @@
         if (key) {
           const node = graphGetNodeByKey(key);
           if (node) {
-            graphSetStatus(`${node.hover || graphNodeLabel(node)} · ${node.kind}`);
+            graphSetStatus(
+              `${node.hover || graphNodeLabel(node)} · ${node.kind}`,
+            );
           }
         } else if (graph.nodes.length) {
-          graphSetStatus(`${graph.nodes.length} nodes, ${graph.edges.length} edges.`);
+          graphSetStatus(
+            `${graph.nodes.length} nodes, ${graph.edges.length} edges.`,
+          );
         }
         graphDraw();
       }
@@ -2650,14 +2675,16 @@
 
       function graphWarmup() {
         if (!graph.dataPromise) {
-          graph.dataPromise = graphBuildData().then((data) => {
-            graph.cachedData = data;
-            return data;
-          }).catch((err) => {
-            graph.dataPromise = null;
-            graph.cachedData = null;
-            throw err;
-          });
+          graph.dataPromise = graphBuildData()
+            .then((data) => {
+              graph.cachedData = data;
+              return data;
+            })
+            .catch((err) => {
+              graph.dataPromise = null;
+              graph.cachedData = null;
+              throw err;
+            });
         }
         return graph.dataPromise;
       }
@@ -2761,7 +2788,10 @@
           )
           .force(
             "collide",
-            d3.forceCollide().radius((node) => graphNodeRadius(node) + 8).iterations(2),
+            d3
+              .forceCollide()
+              .radius((node) => graphNodeRadius(node) + 8)
+              .iterations(2),
           )
           .alphaDecay(0.028)
           .alphaMin(0.015);
@@ -2823,7 +2853,10 @@
           )
           .force(
             "collide",
-            d3.forceCollide().radius((node) => graphNodeRadius(node) + 8).iterations(2),
+            d3
+              .forceCollide()
+              .radius((node) => graphNodeRadius(node) + 8)
+              .iterations(2),
           )
           .alphaDecay(0.028)
           .alphaMin(0.015);
@@ -2877,7 +2910,8 @@
 
         const hovered = graph.hoverKey;
         const activeSet = graphNeighborSet();
-        const showLabels = graph.view.scale >= 0.72 || graph.nodes.length <= 80 || !!hovered;
+        const showLabels =
+          graph.view.scale >= 0.72 || graph.nodes.length <= 80 || !!hovered;
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2897,7 +2931,9 @@
           const source = graphGetNodeByKey(sourceKey);
           const target = graphGetNodeByKey(targetKey);
           if (!source || !target) return;
-          const active = !activeSet || activeSet.has(sourceKey) && activeSet.has(targetKey);
+          const active =
+            !activeSet ||
+            (activeSet.has(sourceKey) && activeSet.has(targetKey));
           ctx.beginPath();
           ctx.moveTo(source.x, source.y);
           ctx.lineTo(target.x, target.y);
@@ -2910,19 +2946,24 @@
           const radius = graphNodeRadius(node);
           ctx.beginPath();
           ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-          ctx.fillStyle = node.kind === "sample"
-            ? palette.sample
-            : node.kind === "experiment"
-              ? palette.experiment
-              : palette.note;
+          ctx.fillStyle =
+            node.kind === "sample"
+              ? palette.sample
+              : node.kind === "experiment"
+                ? palette.experiment
+                : palette.note;
           ctx.globalAlpha = hovered && !active ? 0.26 : 1;
           ctx.fill();
           ctx.globalAlpha = 1;
 
           ctx.lineWidth = 1.5 / graph.view.scale;
-          ctx.strokeStyle = active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)";
+          ctx.strokeStyle = active
+            ? "rgba(255,255,255,0.9)"
+            : "rgba(255,255,255,0.45)";
           if (dark) {
-            ctx.strokeStyle = active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.3)";
+            ctx.strokeStyle = active
+              ? "rgba(255,255,255,0.92)"
+              : "rgba(255,255,255,0.3)";
           }
           ctx.stroke();
         });
@@ -2938,7 +2979,9 @@
           ctx.font = `${Math.max(10, Math.min(13, 12 / Math.max(graph.view.scale, 0.65)))}px 'Segoe UI', system-ui, Arial, sans-serif`;
           ctx.globalAlpha = hovered && !active ? 0.2 : 0.95;
           ctx.fillStyle = palette.text;
-          ctx.strokeStyle = dark ? "rgba(24,24,27,0.92)" : "rgba(255,255,255,0.92)";
+          ctx.strokeStyle = dark
+            ? "rgba(24,24,27,0.92)"
+            : "rgba(255,255,255,0.92)";
           ctx.lineWidth = 3;
           ctx.strokeText(label, node.x, node.y - r - 6 / graph.view.scale);
           ctx.fillText(label, node.x, node.y - r - 6 / graph.view.scale);
@@ -2959,7 +3002,8 @@
           const dx = node.x - world.x;
           const dy = node.y - world.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const hitRadius = graphNodeRadius(node) + 12 / Math.max(graph.view.scale, 0.4);
+          const hitRadius =
+            graphNodeRadius(node) + 12 / Math.max(graph.view.scale, 0.4);
           if (dist <= hitRadius && dist < bestDist) {
             best = node;
             bestDist = dist;
@@ -3034,11 +3078,19 @@
         if (!graph.canvas) return;
         const wasNodeDrag = graph.dragMode === "node" && graph.dragKey;
         const moved =
-          Math.hypot(graph.pointerDownX - (event.clientX - graph.canvas.getBoundingClientRect().left), graph.pointerDownY - (event.clientY - graph.canvas.getBoundingClientRect().top)) > 6;
+          Math.hypot(
+            graph.pointerDownX -
+              (event.clientX - graph.canvas.getBoundingClientRect().left),
+            graph.pointerDownY -
+              (event.clientY - graph.canvas.getBoundingClientRect().top),
+          ) > 6;
         const elapsed = performance.now() - graph.pointerDownTime;
         const draggedKey = graph.dragKey;
 
-        if (graph.pointerId !== null && graph.canvas.hasPointerCapture(graph.pointerId)) {
+        if (
+          graph.pointerId !== null &&
+          graph.canvas.hasPointerCapture(graph.pointerId)
+        ) {
           graph.canvas.releasePointerCapture(graph.pointerId);
         }
 
@@ -3075,14 +3127,19 @@
         const my = event.clientY - rect.top;
         const before = graphScreenToWorld(mx, my);
         const factor = event.deltaY > 0 ? 0.92 : 1.08;
-        graph.view.scale = Math.min(2.6, Math.max(0.35, graph.view.scale * factor));
+        graph.view.scale = Math.min(
+          2.6,
+          Math.max(0.35, graph.view.scale * factor),
+        );
         graph.view.x = mx - graph.width / 2 - before.x * graph.view.scale;
         graph.view.y = my - graph.height / 2 - before.y * graph.view.scale;
         graphDraw();
       }
 
       function graphAnimate(ts) {
-        if (!document.getElementById("page-graph")?.classList.contains("active")) {
+        if (
+          !document.getElementById("page-graph")?.classList.contains("active")
+        ) {
           graphStopAnimation();
           return;
         }
