@@ -572,13 +572,19 @@ def list_notes(
     if q:
         like = f"%{q}%"
         stmt = stmt.where(Note.title.like(like) | Note.body.like(like))
-    return session.exec(stmt.order_by(Note.updated_at.desc())).all()
+    return session.exec(stmt.order_by(Note.pinned.desc(), Note.updated_at.desc())).all()
 
 
 @app.post("/api/notes", response_model=NoteRead, status_code=201)
 def create_note(data: NoteCreate, session: Session = Depends(get_session)):
     now = _now()
-    note = Note(title=data.title, body=data.body, created_at=now, updated_at=now)
+    note = Note(
+        title=data.title,
+        body=data.body,
+        pinned=data.pinned,
+        created_at=now,
+        updated_at=now,
+    )
     session.add(note)
     session.commit()
     session.refresh(note)
@@ -604,6 +610,8 @@ def update_note(
         note.title = data.title
     if data.body is not None:
         note.body = data.body
+    if data.pinned is not None:
+        note.pinned = data.pinned
     note.updated_at = _now()
     session.add(note)
     session.commit()

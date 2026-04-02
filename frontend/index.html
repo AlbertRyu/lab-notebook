@@ -766,6 +766,20 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .note-item .n-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .note-item .n-pin {
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: 999px;
+        padding: 1px 5px;
+        flex-shrink: 0;
+      }
       .note-item .n-date {
         font-size: 10.5px;
         color: var(--fg-muted);
@@ -1382,6 +1396,13 @@
                   Preview
                 </div>
                 <div style="flex: 1"></div>
+                <button
+                  id="note-pin-btn"
+                  style="margin: 4px 0; padding: 3px 8px"
+                  onclick="noteTogglePin()"
+                >
+                  Pin
+                </button>
                 <button
                   class="danger"
                   style="margin: 4px 8px; padding: 3px 8px"
@@ -2170,7 +2191,10 @@
           .map(
             (n) => `
     <div class="note-item${notes.current && notes.current.id === n.id ? " active" : ""}" onclick="notesSelect(${n.id})">
-      <div class="n-title">${esc(n.title) || '<em style="color:var(--fg-muted)">Untitled</em>'}</div>
+      <div class="n-title-row">
+        <div class="n-title">${esc(n.title) || '<em style="color:var(--fg-muted)">Untitled</em>'}</div>
+        ${n.pinned ? '<span class="n-pin">PIN</span>' : ""}
+      </div>
       <div class="n-date">${fmtDate(n.updated_at)}</div>
       <div class="n-preview">${esc(notesStripMentions(n.body).slice(0, 80))}</div>
     </div>`,
@@ -2198,8 +2222,40 @@
         document.getElementById("notes-editor-wrap").style.display = "flex";
         document.getElementById("note-title-input").value = n.title || "";
         document.getElementById("note-body").value = n.body || "";
+        document.getElementById("note-pin-btn").textContent = n.pinned
+          ? "Unpin"
+          : "Pin";
         document.getElementById("note-save-status").textContent = "";
         noteSetTab("edit");
+      }
+
+      async function noteTogglePin() {
+        if (!notes.current) return;
+        clearTimeout(_noteSaveTimer);
+        const title =
+          document.getElementById("note-title-input").value.trim() ||
+          "Untitled";
+        const body = document.getElementById("note-body").value;
+        const pinned = !notes.current.pinned;
+        try {
+          const updated = await api(`/api/notes/${notes.current.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, body, pinned }),
+          });
+          notes.current = updated;
+          notes.dirty = false;
+          document.getElementById("note-save-status").textContent = pinned
+            ? "Pinned"
+            : "Unpinned";
+          await notesLoadList(
+            document.getElementById("notes-search-input").value.trim(),
+          );
+          notesRenderEditor();
+        } catch (e) {
+          document.getElementById("note-save-status").textContent =
+            "Pin failed";
+        }
       }
 
       async function createNewNote() {

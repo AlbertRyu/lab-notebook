@@ -114,6 +114,7 @@ class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
     body: str = Field(default="")
+    pinned: bool = Field(default=False)
     created_at: Optional[Datetime] = Field(default=None)
     updated_at: Optional[Datetime] = Field(default=None)
 
@@ -122,6 +123,7 @@ class NoteRead(SQLModel):
     id: int
     title: str
     body: str
+    pinned: bool = False
     created_at: Optional[Datetime]
     updated_at: Optional[Datetime]
 
@@ -129,11 +131,13 @@ class NoteRead(SQLModel):
 class NoteCreate(SQLModel):
     title: str
     body: str = ""
+    pinned: bool = False
 
 
 class NoteUpdate(SQLModel):
     title: Optional[str] = None
     body: Optional[str] = None
+    pinned: Optional[bool] = None
 
 
 # ── Cross-sample file listing ──────────────────────────────────────────────
