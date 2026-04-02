@@ -1,0 +1,40 @@
+data/
+__pycache__/
+*.pyc
+*.db
+.env
+.claude/
+example_data/
+
+# macOS
+.DS_Store
+
+# Python cache / bytecode
+**/__pycache__/
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Coverage / test artifacts
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE/editor
+.vscode/
+.idea/

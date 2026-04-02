@@ -1,0 +1,2626 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab Notebook</title>
+    <script
+      src="https://cdn.plot.ly/plotly-2.35.2.min.js"
+      charset="utf-8"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <style>
+      /* ── Theme variables ── */
+      :root {
+        --bg: #ffffff;
+        --bg-panel: #f7f7f8;
+        --bg-header: #efefef;
+        --fg: #111111;
+        --fg-dim: #555555;
+        --fg-muted: #999999;
+        --border: #e0e0e0;
+        --border-strong: #cccccc;
+        --accent: #2563eb;
+        --accent-fg: #ffffff;
+        --accent-hover: #1d4ed8;
+        --row-hover: #f0f4ff;
+        --row-selected: #dbeafe;
+        --bg-btn: #f5f5f5;
+        --bg-btn-hover: #ebebeb;
+        --radius: 5px;
+        --nav-w: 52px;
+        --tag-microscopy: #7c3aed;
+        --tag-pxrd: #0891b2;
+        --tag-sxrd: #0f766e;
+        --tag-ppms-vsm: #b45309;
+        --tag-ppms-hc: #92400e;
+        --danger: #dc2626;
+      }
+      [data-theme="dark"] {
+        --bg: #18181b;
+        --bg-panel: #1e1e21;
+        --bg-header: #27272a;
+        --fg: #e4e4e7;
+        --fg-dim: #a1a1aa;
+        --fg-muted: #71717a;
+        --border: #3f3f46;
+        --border-strong: #52525b;
+        --accent: #3b82f6;
+        --accent-fg: #ffffff;
+        --accent-hover: #2563eb;
+        --row-hover: #27272a;
+        --row-selected: #1e3a5f;
+        --bg-btn: #3f3f46;
+        --bg-btn-hover: #52525b;
+        --tag-microscopy: #a78bfa;
+        --tag-pxrd: #22d3ee;
+        --tag-sxrd: #2dd4bf;
+        --tag-ppms-vsm: #fbbf24;
+        --tag-ppms-hc: #fb923c;
+        --danger: #f87171;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+        font-family: "Segoe UI", system-ui, Arial, sans-serif;
+        font-size: 13px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+
+      /* ── App shell ── */
+      #app {
+        display: flex;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* ── Left nav ── */
+      #nav {
+        width: var(--nav-w);
+        flex-shrink: 0;
+        background: var(--bg-header);
+        border-right: 1px solid var(--border-strong);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 0;
+        gap: 4px;
+        z-index: 10;
+      }
+      #nav .nav-logo {
+        font-size: 18px;
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-weight: 900;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .nav-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--fg-muted);
+        transition:
+          background 0.12s,
+          color 0.12s;
+        border: none;
+        background: none;
+        position: relative;
+      }
+      .nav-btn:hover {
+        background: var(--row-hover);
+        color: var(--fg);
+      }
+      .nav-btn.active {
+        background: var(--row-selected);
+        color: var(--accent);
+      }
+      .nav-btn title {
+        display: none;
+      }
+      #nav .spacer {
+        flex: 1;
+      }
+      #nav .nav-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* ── Pages ── */
+      #pages {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .page {
+        display: none;
+        flex: 1;
+        overflow: hidden;
+        flex-direction: column;
+      }
+      .page.active {
+        display: flex;
+      }
+
+      /* ── Page header ── */
+      .page-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        background: var(--bg-header);
+        border-bottom: 1px solid var(--border-strong);
+        flex-shrink: 0;
+      }
+      .page-header h2 {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--fg);
+        margin-right: 4px;
+      }
+      .page-header .sep {
+        flex: 1;
+      }
+
+      /* ── Shared components ── */
+      button {
+        padding: 5px 11px;
+        font-size: 12px;
+        font-family: inherit;
+        cursor: pointer;
+        background: var(--bg-btn);
+        color: var(--fg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        white-space: nowrap;
+        transition: background 0.12s;
+      }
+      button:hover {
+        background: var(--bg-btn-hover);
+      }
+      button:active {
+        opacity: 0.75;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      button.primary {
+        background: var(--accent);
+        color: var(--accent-fg);
+        border-color: var(--accent);
+      }
+      button.primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+      button.danger {
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+      button.danger:hover {
+        background: color-mix(in srgb, var(--danger) 10%, transparent);
+      }
+
+      input,
+      textarea,
+      select {
+        padding: 5px 8px;
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        color: var(--fg);
+        font-size: 12.5px;
+        font-family: inherit;
+        outline: none;
+      }
+      input:focus,
+      textarea:focus,
+      select:focus {
+        border-color: var(--accent);
+      }
+
+      .placeholder {
+        padding: 40px;
+        text-align: center;
+        color: var(--fg-muted);
+        font-size: 13px;
+      }
+      .placeholder .icon {
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .tag-ppms-vsm {
+        background: color-mix(in srgb, var(--tag-ppms-vsm) 15%, transparent);
+        color: var(--tag-ppms-vsm);
+      }
+      .tag-ppms-hc {
+        background: color-mix(in srgb, var(--tag-ppms-hc) 15%, transparent);
+        color: var(--tag-ppms-hc);
+      }
+      .tag-pxrd {
+        background: color-mix(in srgb, var(--tag-pxrd) 15%, transparent);
+        color: var(--tag-pxrd);
+      }
+      .tag-sxrd {
+        background: color-mix(in srgb, var(--tag-sxrd) 15%, transparent);
+        color: var(--tag-sxrd);
+      }
+      .tag-microscopy {
+        background: color-mix(in srgb, var(--tag-microscopy) 15%, transparent);
+        color: var(--tag-microscopy);
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      /* ── Resizer ── */
+      .resizer {
+        width: 5px;
+        flex-shrink: 0;
+        cursor: col-resize;
+        background: var(--border-strong);
+        transition: background 0.15s;
+        user-select: none;
+      }
+      .resizer:hover,
+      .resizer.dragging {
+        background: var(--accent);
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+   PAGE 1 — INVENTORY
+   ══════════════════════════════════════════════════════════════ */
+      #page-inventory {
+        flex-direction: row;
+      }
+
+      #inv-left {
+        width: 290px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+      }
+      #inv-search {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      #inv-search input {
+        width: 100%;
+      }
+      #inv-filters {
+        display: flex;
+        gap: 4px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      #inv-filters select {
+        flex: 1;
+        min-width: 0;
+        font-size: 11.5px;
+      }
+      #inv-list {
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+      }
+      #inv-footer {
+        padding: 6px 10px;
+        border-top: 1px solid var(--border);
+        font-size: 11px;
+        color: var(--fg-muted);
+        display: flex;
+        justify-content: space-between;
+      }
+      .sample-item {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .sample-item:hover {
+        background: var(--row-hover);
+      }
+      .sample-item.active {
+        background: var(--row-selected);
+      }
+      .sample-item .s-name {
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+      .sample-item .s-meta {
+        font-size: 11px;
+        color: var(--fg-muted);
+        margin-top: 2px;
+      }
+      .sample-item .s-tags {
+        display: flex;
+        gap: 4px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+      }
+
+      #inv-right {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #detail-header {
+        padding: 12px 18px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-panel);
+      }
+      #detail-header h2 {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 4px 16px;
+        margin-top: 8px;
+      }
+      .meta-item {
+        font-size: 11.5px;
+        color: var(--fg-dim);
+      }
+      .meta-item span {
+        color: var(--fg);
+        font-weight: 500;
+      }
+
+      .meas-card {
+        padding: 12px 14px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .meas-card + .meas-card {
+        margin-top: 8px;
+      }
+
+      /* gallery */
+      .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .gallery-item {
+        position: relative;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        transition:
+          border-color 0.15s,
+          transform 0.15s;
+      }
+      .gallery-item:hover {
+        border-color: var(--accent);
+        transform: scale(1.02);
+      }
+      .gallery-item img {
+        display: block;
+        width: 140px;
+        height: 110px;
+        object-fit: cover;
+      }
+      .gallery-item .img-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 10px;
+        padding: 3px 5px;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .gallery-item .img-del {
+        display: none;
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 11px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 20px;
+        text-align: center;
+      }
+      .gallery-item:hover .img-del {
+        display: block;
+      }
+      .gallery-item .img-del:hover {
+        background: var(--danger);
+      }
+
+      /* file list */
+      .file-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 6px;
+      }
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 12px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        width: 100%;
+      }
+      .file-row .fname {
+        flex: 1;
+        font-family: monospace;
+        font-size: 11.5px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.45;
+        min-width: 0;
+      }
+      .file-row a {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 11.5px;
+        margin-left: auto;
+      }
+      .file-row a:hover {
+        text-decoration: underline;
+      }
+      .file-row .f-del {
+        color: var(--fg-muted);
+        background: none;
+        border: none;
+        padding: 0 2px;
+        font-size: 13px;
+        cursor: pointer;
+        align-self: flex-end;
+      }
+      .file-row .f-del:hover {
+        color: var(--danger);
+      }
+
+      /* experiment notes inline editor */
+      .exp-notes-view {
+        font-size: 12px;
+        color: var(--fg-dim);
+        font-style: italic;
+        cursor: pointer;
+        min-height: 18px;
+      }
+      .exp-notes-view:hover {
+        color: var(--fg);
+      }
+      .exp-notes-input {
+        width: 100%;
+        font-size: 12px;
+        resize: vertical;
+        min-height: 52px;
+      }
+
+      /* section label */
+      .sec-label {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--fg-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 6px;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+   PAGE 2 — VISUALIZATION
+   ══════════════════════════════════════════════════════════════ */
+      #page-viz {
+        flex-direction: row;
+      }
+
+      #viz-left {
+        width: 320px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+      }
+      #viz-toolbar {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      #viz-toolbar select {
+        flex: 1;
+        min-width: 80px;
+        font-size: 11.5px;
+      }
+      #viz-table-wrap {
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      #viz-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      #viz-table col.c-sel {
+        width: 30px;
+      }
+      #viz-table col.c-mode {
+        width: 96px;
+      }
+      #viz-table th {
+        background: var(--bg-header);
+        padding: 5px 7px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--fg-dim);
+        border-bottom: 1px solid var(--border-strong);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+      #viz-table td {
+        padding: 4px 7px;
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+      #viz-table tr:hover td {
+        background: var(--row-hover);
+      }
+      #viz-table tr.selected td {
+        background: var(--row-selected);
+      }
+      #viz-table .fname {
+        font-family: monospace;
+        font-size: 11px;
+      }
+      #viz-table .fsample {
+        font-size: 10.5px;
+        color: var(--fg-muted);
+        display: block;
+      }
+
+      #viz-status {
+        padding: 5px 10px;
+        font-size: 11.5px;
+        color: var(--fg-dim);
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg-header);
+        flex-shrink: 0;
+        min-height: 28px;
+      }
+      #viz-status::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--fg-muted);
+        flex-shrink: 0;
+      }
+      #viz-status.ready::before {
+        background: #22c55e;
+      }
+      #viz-status.busy::before {
+        background: #f59e0b;
+      }
+      #viz-status.error::before {
+        background: #ef4444;
+      }
+
+      .mode-group {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .mode-group label {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 11px;
+        cursor: pointer;
+        color: var(--fg-dim);
+      }
+      .mode-group label:has(input:checked) {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .mode-group input[type="radio"] {
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      input[type="checkbox"] {
+        accent-color: var(--accent);
+        cursor: pointer;
+        width: 14px;
+        height: 14px;
+      }
+
+      #viz-right {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #viz-plot-toolbar {
+        padding: 7px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-header);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      #viz-plot {
+        flex: 1;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+   PAGE 3 — NOTES
+   ══════════════════════════════════════════════════════════════ */
+      #page-notes {
+        flex-direction: row;
+      }
+
+      #notes-left {
+        width: 260px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+      }
+      #notes-search {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      #notes-search input {
+        width: 100%;
+      }
+      #notes-list {
+        flex: 1;
+        overflow-y: auto;
+      }
+      .note-item {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .note-item:hover {
+        background: var(--row-hover);
+      }
+      .note-item.active {
+        background: var(--row-selected);
+      }
+      .note-item .n-title {
+        font-weight: 600;
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .note-item .n-date {
+        font-size: 10.5px;
+        color: var(--fg-muted);
+        margin-top: 2px;
+      }
+      .note-item .n-preview {
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      #notes-right {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #note-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 16px 20px;
+        gap: 10px;
+      }
+      #note-title-input {
+        font-size: 18px;
+        font-weight: 700;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        border-radius: 0;
+        padding: 4px 0;
+        width: 100%;
+        background: transparent;
+        color: var(--fg);
+      }
+      #note-title-input:focus {
+        border-bottom-color: var(--accent);
+        outline: none;
+      }
+      #note-body-wrap {
+        flex: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      #note-body {
+        flex: 1;
+        resize: none;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.6;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      #note-body:focus {
+        border-color: var(--accent);
+        outline: none;
+      }
+      #note-footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 6px;
+        flex-shrink: 0;
+      }
+      #note-save-status {
+        font-size: 11px;
+        color: var(--fg-muted);
+      }
+
+      /* @mention autocomplete */
+      #mention-dropdown {
+        position: fixed;
+        z-index: 500;
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        max-height: 200px;
+        overflow-y: auto;
+        min-width: 220px;
+        display: none;
+      }
+      .mention-option {
+        padding: 7px 12px;
+        cursor: pointer;
+        font-size: 12.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mention-option:hover,
+      .mention-option.focused {
+        background: var(--row-hover);
+      }
+      .mention-option .mo-type {
+        font-size: 10px;
+        color: var(--fg-muted);
+      }
+
+      /* @mention chip in rendered preview */
+      .mention-chip {
+        display: inline-block;
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        color: var(--accent);
+        border-radius: 3px;
+        padding: 0 4px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .mention-chip:hover {
+        text-decoration: underline;
+      }
+
+      /* note rendered view — markdown prose */
+      #note-render {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 14px;
+        line-height: 1.75;
+        font-size: 13.5px;
+        display: none;
+      }
+      #note-render h1,
+      #note-render h2,
+      #note-render h3,
+      #note-render h4 {
+        margin: 1em 0 0.4em;
+        font-weight: 700;
+        line-height: 1.3;
+        color: var(--fg);
+      }
+      #note-render h1 {
+        font-size: 1.5em;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.25em;
+      }
+      #note-render h2 {
+        font-size: 1.25em;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.2em;
+      }
+      #note-render h3 {
+        font-size: 1.1em;
+      }
+      #note-render p {
+        margin: 0 0 0.75em;
+      }
+      #note-render ul,
+      #note-render ol {
+        margin: 0 0 0.75em 1.4em;
+      }
+      #note-render li {
+        margin-bottom: 0.2em;
+      }
+      #note-render code {
+        background: var(--bg-header);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        font-size: 12px;
+        font-family: monospace;
+      }
+      #note-render pre {
+        background: var(--bg-header);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        overflow-x: auto;
+        margin: 0 0 0.75em;
+      }
+      #note-render pre code {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 12px;
+      }
+      #note-render blockquote {
+        border-left: 3px solid var(--accent);
+        margin: 0 0 0.75em;
+        padding: 4px 12px;
+        color: var(--fg-dim);
+      }
+      #note-render a {
+        color: var(--accent);
+      }
+      #note-render a:hover {
+        text-decoration: underline;
+      }
+      #note-render table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 0.75em;
+        font-size: 12.5px;
+      }
+      #note-render th,
+      #note-render td {
+        border: 1px solid var(--border-strong);
+        padding: 5px 10px;
+        text-align: left;
+      }
+      #note-render th {
+        background: var(--bg-header);
+        font-weight: 600;
+      }
+      #note-render hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 1em 0;
+      }
+      #note-render p {
+        margin-bottom: 8px;
+      }
+
+      #note-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .note-tab {
+        padding: 5px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        color: var(--fg-dim);
+      }
+      .note-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+
+      /* ── Lightbox ── */
+      #lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.85);
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      #lightbox.open {
+        display: flex;
+      }
+      #lightbox img {
+        max-width: 92vw;
+        max-height: 90vh;
+        border-radius: 4px;
+        cursor: default;
+      }
+      #lightbox-close {
+        position: absolute;
+        top: 14px;
+        right: 18px;
+        font-size: 22px;
+        color: #fff;
+        cursor: pointer;
+        background: none;
+        border: none;
+        opacity: 0.8;
+      }
+      #lightbox-close:hover {
+        opacity: 1;
+      }
+
+      /* ── Modal ── */
+      #modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+      }
+      #modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        padding: 24px;
+        min-width: 360px;
+        max-width: 480px;
+        width: 100%;
+      }
+      .modal h3 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+      .form-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .form-row label {
+        font-size: 11.5px;
+        color: var(--fg-dim);
+      }
+      .form-row input,
+      .form-row textarea,
+      .form-row select {
+        width: 100%;
+      }
+      .form-row textarea {
+        resize: vertical;
+        min-height: 60px;
+      }
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- ── Left nav ── -->
+      <nav id="nav">
+        <div class="nav-logo">🧪</div>
+        <button
+          class="nav-btn active"
+          id="nav-inventory"
+          title="Sample Inventory"
+          onclick="showPage('inventory')"
+        >
+          📋
+        </button>
+        <button
+          class="nav-btn"
+          id="nav-viz"
+          title="Data Visualization"
+          onclick="showPage('viz')"
+        >
+          📈
+        </button>
+        <button
+          class="nav-btn"
+          id="nav-notes"
+          title="Notes"
+          onclick="showPage('notes')"
+        >
+          📝
+        </button>
+        <div class="spacer"></div>
+        <div class="nav-bottom">
+          <button class="nav-btn" title="Toggle Theme" onclick="toggleTheme()">
+            🌓
+          </button>
+        </div>
+      </nav>
+
+      <!-- ── Pages ── -->
+      <div id="pages">
+        <!-- ══ PAGE 1: INVENTORY ══ -->
+        <div class="page active" id="page-inventory">
+          <!-- Left: sample list -->
+          <div id="inv-left">
+            <div id="inv-search">
+              <input
+                id="inv-search-input"
+                type="search"
+                placeholder="Search samples…"
+                oninput="invApplyFilters()"
+              />
+            </div>
+            <div id="inv-filters">
+              <select id="inv-compound" onchange="invApplyFilters()">
+                <option value="">All compounds</option>
+              </select>
+              <select id="inv-batch" onchange="invApplyFilters()">
+                <option value="">All batches</option>
+              </select>
+              <select id="inv-box" onchange="invApplyFilters()">
+                <option value="">All boxes</option>
+              </select>
+            </div>
+            <div id="inv-list"></div>
+            <div id="inv-footer">
+              <span id="inv-count">0 samples</span>
+              <span id="inv-scan-status"></span>
+            </div>
+          </div>
+          <!-- Resizer -->
+          <div class="resizer" data-target="inv-left"></div>
+          <!-- Right: detail -->
+          <div id="inv-right">
+            <div
+              id="inv-header-toolbar"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 14px;
+                background: var(--bg-header);
+                border-bottom: 1px solid var(--border-strong);
+                flex-shrink: 0;
+              "
+            >
+              <span style="font-weight: 700; font-size: 13px"
+                >Sample Inventory</span
+              >
+              <div style="flex: 1"></div>
+              <button class="primary" onclick="openAddSample()">
+                + Sample
+              </button>
+              <button onclick="triggerScan()">Scan Folder</button>
+            </div>
+            <div
+              id="inv-detail-placeholder"
+              class="placeholder"
+              style="
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div class="icon">🔬</div>
+              <div>Select a sample to view details</div>
+            </div>
+            <div
+              id="inv-detail-view"
+              style="
+                display: none;
+                flex: 1;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div id="inv-detail-scroll" style="flex: 1; overflow-y: auto">
+                <div id="detail-header">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: flex-start;
+                      justify-content: space-between;
+                      gap: 12px;
+                    "
+                  >
+                    <h2 id="detail-name"></h2>
+                    <div style="display: flex; gap: 6px; flex-shrink: 0">
+                      <button onclick="openAddExperiment()">
+                        + Experiment
+                      </button>
+                      <button onclick="openEditSample()">Edit</button>
+                    </div>
+                  </div>
+                  <div class="meta-grid" id="detail-meta"></div>
+                  <div
+                    id="detail-notes"
+                    style="
+                      font-size: 12px;
+                      color: var(--fg-dim);
+                      margin-top: 6px;
+                      font-style: italic;
+                    "
+                  ></div>
+                  <!-- Sample-level photos -->
+                  <div id="sample-photos" style="margin-top: 10px"></div>
+                </div>
+                <!-- Measurements section -->
+                <div
+                  id="inv-measurements"
+                  style="padding: 12px 18px 18px"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ PAGE 2: VISUALIZATION ══ -->
+        <div class="page" id="page-viz">
+          <!-- Left: file picker -->
+          <div id="viz-left">
+            <div id="viz-toolbar">
+              <select id="viz-exp-type" onchange="vizLoadFiles()">
+                <option value="ppms-vsm">PPMS-VSM</option>
+                <option value="ppms-hc">PPMS-HC</option>
+                <option value="pxrd">PXRD</option>
+                <option value="sxrd">SXRD</option>
+              </select>
+              <select id="viz-sample-filter" onchange="vizLoadFiles()">
+                <option value="">All samples</option>
+              </select>
+            </div>
+            <div id="viz-table-wrap">
+              <table id="viz-table">
+                <colgroup>
+                  <col />
+                  <col class="c-mode" />
+                  <col class="c-sel" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Mode</th>
+                    <th>
+                      <input
+                        type="checkbox"
+                        id="viz-select-all"
+                        title="Select all"
+                      />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="viz-tbody"></tbody>
+              </table>
+            </div>
+            <div id="viz-status">Open a data type to begin.</div>
+          </div>
+          <!-- Resizer -->
+          <div class="resizer" data-target="viz-left"></div>
+          <!-- Right: plot -->
+          <div id="viz-right">
+            <div id="viz-plot-toolbar">
+              <span style="font-weight: 700; font-size: 13px"
+                >Data Visualization</span
+              >
+              <div style="flex: 1"></div>
+              <button
+                class="primary"
+                id="viz-plot-btn"
+                disabled
+                onclick="vizRenderPlot()"
+              >
+                Plot Selected
+              </button>
+              <button onclick="vizClearPlot()">Clear</button>
+            </div>
+            <div id="viz-plot"></div>
+          </div>
+        </div>
+
+        <!-- ══ PAGE 3: NOTES ══ -->
+        <div class="page" id="page-notes">
+          <!-- Left: notes list -->
+          <div id="notes-left">
+            <div
+              style="
+                padding: 7px 10px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                gap: 6px;
+              "
+            >
+              <span style="font-weight: 700; font-size: 13px; flex: 1"
+                >Notes</span
+              >
+              <button class="primary" onclick="createNewNote()">+ Note</button>
+            </div>
+            <div id="notes-search">
+              <input
+                id="notes-search-input"
+                type="search"
+                placeholder="Search notes…"
+                oninput="notesApplySearch()"
+              />
+            </div>
+            <div id="notes-list"></div>
+          </div>
+          <!-- Resizer -->
+          <div class="resizer" data-target="notes-left"></div>
+          <!-- Right: editor -->
+          <div id="notes-right">
+            <div
+              id="notes-placeholder"
+              class="placeholder"
+              style="
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div class="icon">📝</div>
+              <div>Select a note or create a new one</div>
+              <div
+                style="font-size: 11px; color: var(--fg-muted); margin-top: 8px"
+              >
+                Use @ to mention samples
+              </div>
+            </div>
+            <div
+              id="notes-editor-wrap"
+              style="
+                display: none;
+                flex: 1;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div id="note-tabs">
+                <div class="note-tab active" onclick="noteSetTab('edit')">
+                  Edit
+                </div>
+                <div class="note-tab" onclick="noteSetTab('preview')">
+                  Preview
+                </div>
+                <div style="flex: 1"></div>
+                <button
+                  class="danger"
+                  style="margin: 4px 8px; padding: 3px 8px"
+                  onclick="deleteCurrentNote()"
+                >
+                  Delete
+                </button>
+              </div>
+              <div id="note-editor">
+                <input
+                  id="note-title-input"
+                  type="text"
+                  placeholder="Note title…"
+                  oninput="noteMarkDirty()"
+                />
+                <div id="note-body-wrap">
+                  <textarea
+                    id="note-body"
+                    placeholder="Start writing… use @ to mention a sample or experiment."
+                    oninput="
+                      noteMarkDirty();
+                      noteHandleMention(event);
+                    "
+                    onkeydown="noteHandleMentionKey(event)"
+                  ></textarea>
+                  <div id="note-render"></div>
+                </div>
+                <div id="note-footer">
+                  <button
+                    class="primary"
+                    id="note-save-btn"
+                    onclick="noteSave()"
+                  >
+                    Save
+                  </button>
+                  <span id="note-save-status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /pages -->
+    </div>
+    <!-- /app -->
+
+    <!-- Lightbox -->
+    <div id="lightbox" onclick="closeLightbox()">
+      <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+      <img id="lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
+    </div>
+
+    <!-- @mention dropdown -->
+    <div id="mention-dropdown"></div>
+
+    <!-- Modal -->
+    <div id="modal-overlay" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3 id="modal-title">Add Sample</h3>
+        <div id="modal-body"></div>
+        <div class="form-actions">
+          <button onclick="closeModal()">Cancel</button>
+          <button class="primary" id="modal-submit">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ═══════════════════════════════════════════════════════════════════════════
+      // GLOBAL STATE & UTILS
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const savedTheme = localStorage.getItem("theme") || "light";
+      document.documentElement.setAttribute("data-theme", savedTheme);
+
+      function toggleTheme() {
+        const next =
+          document.documentElement.getAttribute("data-theme") === "dark"
+            ? "light"
+            : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("theme", next);
+        if (_vizPlotted) vizRenderPlot();
+      }
+
+      async function api(path, opts = {}) {
+        const res = await fetch(path, opts);
+        if (!res.ok) throw new Error(await res.text());
+        if (res.status === 204) return null;
+        return res.json();
+      }
+
+      function esc(s) {
+        if (s == null) return "";
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function fmtDate(iso) {
+        if (!iso) return "";
+        return new Date(iso).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+
+      // Page navigation
+      function showPage(name) {
+        document
+          .querySelectorAll(".page")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById("page-" + name).classList.add("active");
+        document.getElementById("nav-" + name).classList.add("active");
+        if (name === "viz" && !_vizLoaded) vizInit();
+        if (name === "notes" && !_notesLoaded) notesInit();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeLightbox();
+          closeModal();
+          mentionHide();
+        }
+      });
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // PAGE 1 — INVENTORY
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const inv = {
+        samples: [],
+        current: null,
+      };
+
+      (async function invInit() {
+        await invLoadFilters();
+        await invLoadSamples();
+      })();
+
+      async function invLoadFilters() {
+        try {
+          const f = await api("/api/filters");
+          invPopSelect("inv-compound", f.compounds, "All compounds");
+          invPopSelect("inv-batch", f.batches, "All batches");
+          invPopSelect("inv-box", f.boxes, "All boxes");
+        } catch (_) {}
+      }
+
+      function invPopSelect(id, values, ph) {
+        const sel = document.getElementById(id);
+        const cur = sel.value;
+        sel.innerHTML =
+          `<option value="">${ph}</option>` +
+          values
+            .map(
+              (v) =>
+                `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`,
+            )
+            .join("");
+      }
+
+      async function invLoadSamples() {
+        const p = new URLSearchParams();
+        const q = document.getElementById("inv-search-input").value.trim();
+        const compound = document.getElementById("inv-compound").value;
+        const batch = document.getElementById("inv-batch").value;
+        const box = document.getElementById("inv-box").value;
+        if (q) p.set("q", q);
+        if (compound) p.set("compound", compound);
+        if (batch) p.set("batch", batch);
+        if (box) p.set("box", box);
+        inv.samples = await api("/api/samples?" + p);
+        invRenderList();
+      }
+
+      function invApplyFilters() {
+        invLoadSamples();
+      }
+
+      function invRenderList() {
+        const list = document.getElementById("inv-list");
+        document.getElementById("inv-count").textContent =
+          `${inv.samples.length} sample${inv.samples.length !== 1 ? "s" : ""}`;
+        if (!inv.samples.length) {
+          list.innerHTML =
+            '<div class="placeholder" style="padding:20px;text-align:center;color:var(--fg-muted);">No samples</div>';
+          return;
+        }
+        list.innerHTML = inv.samples
+          .map(
+            (s) => `
+    <div class="sample-item${inv.current && inv.current.id === s.id ? " active" : ""}" onclick="invSelectSample(${s.id})">
+      <div class="s-name">${esc(s.name)}</div>
+      <div class="s-meta">${esc(s.compound)}${s.batch ? " · " + esc(s.batch) : ""}${s.box ? " · Box " + esc(s.box) : ""}</div>
+    </div>
+  `,
+          )
+          .join("");
+      }
+
+      async function invSelectSample(id) {
+        inv.current = await api(`/api/samples/${id}`);
+        invRenderDetail();
+        invRenderList();
+      }
+
+      function invRenderDetail() {
+        const s = inv.current;
+        document.getElementById("inv-detail-placeholder").style.display =
+          "none";
+        const dv = document.getElementById("inv-detail-view");
+        dv.style.display = "flex";
+
+        document.getElementById("detail-name").textContent = s.name;
+
+        const items = [
+          ["Compound", s.compound],
+          ["Synthesized", s.synthesis_date],
+          ["Batch", s.batch],
+          ["Box", s.box],
+          ["Crystal size", s.crystal_size],
+        ].filter(([, v]) => v);
+        document.getElementById("detail-meta").innerHTML = items
+          .map(
+            ([k, v]) =>
+              `<div class="meta-item">${esc(k)}: <span>${esc(v)}</span></div>`,
+          )
+          .join("");
+        const notesEl = document.getElementById("detail-notes");
+        notesEl.textContent = s.notes || "";
+        notesEl.style.display = s.notes ? "" : "none";
+
+        // Sample-level photos
+        invRenderSamplePhotos(s);
+
+        // Measurements
+        invRenderMeasurements(s);
+      }
+
+      function invRenderSamplePhotos(s) {
+        const el = document.getElementById("sample-photos");
+        const files = s.sample_files || [];
+        el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span class="sec-label">Sample Photos</span>
+      <button style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('sp-upload').click()">+ Photo</button>
+      <input type="file" multiple accept="image/*" id="sp-upload" style="display:none"
+        onchange="invUploadSamplePhoto(${s.id},this)">
+    </div>
+    ${
+      files.length
+        ? `<div class="gallery">${files
+            .map(
+              (f) => `
+      <div class="gallery-item">
+        <img src="/files/${esc(f.path)}?v=${f.id}" alt="${esc(f.filename)}" loading="lazy"
+          onclick="openLightbox('/files/${esc(f.path)}?v=${f.id}','${esc(f.filename)}')">
+        <div class="img-name">${esc(f.filename)}</div>
+        <button class="img-del" title="Delete" onclick="event.stopPropagation();invDeleteSamplePhoto(${s.id},${f.id})">✕</button>
+      </div>`,
+            )
+            .join("")}</div>`
+        : `<div style="font-size:12px;color:var(--fg-muted);">No photos yet</div>`
+    }`;
+      }
+
+      function invRenderMeasurements(s) {
+        const mSection = document.getElementById("inv-measurements");
+        if (!s.experiments.length) {
+          mSection.innerHTML =
+            '<div class="placeholder">No experiments recorded yet</div>';
+          return;
+        }
+
+        const typeLabel = {
+          "ppms-vsm": "PPMS-VSM",
+          "ppms-hc": "PPMS-HC",
+          pxrd: "PXRD",
+          sxrd: "SXRD",
+          microscopy: "Microscopy",
+        };
+
+        mSection.innerHTML = `
+    <div class="sec-label" style="padding:0 0 8px;">Measurements</div>
+    ${s.experiments
+      .map((exp) => {
+        const images = exp.files.filter(
+          (f) => f.file_type === "image" || f.file_type === "screenshot",
+        );
+        const dataFiles = exp.files.filter((f) => f.file_type === "data");
+        const label = typeLabel[exp.type] || exp.type.toUpperCase();
+        return `<div class="meas-card" id="meas-${exp.id}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span class="tag tag-${exp.type}">${label}</span>
+          ${exp.exp_date ? `<span style="font-size:11px;color:var(--fg-muted);">${exp.exp_date}</span>` : ""}
+          <div style="flex:1"></div>
+          <button class="danger" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
+        </div>
+
+        <!-- Notes -->
+        <div style="margin-bottom:10px;">
+          <div class="sec-label">Notes</div>
+          <div class="exp-notes-view" id="exp-notes-view-${exp.id}"
+            onclick="invStartEditNote(${exp.id})"
+            title="Click to edit">${esc(exp.notes || "Click to add notes…")}</div>
+          <div id="exp-notes-edit-${exp.id}" style="display:none;">
+            <textarea class="exp-notes-input" id="exp-notes-ta-${exp.id}">${esc(exp.notes || "")}</textarea>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button style="font-size:11px;padding:3px 8px;" class="primary"
+                onclick="invSaveNote(${exp.id})">Save</button>
+              <button style="font-size:11px;padding:3px 8px;"
+                onclick="invCancelNote(${exp.id})">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photos -->
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span class="sec-label">Photos</span>
+            <button style="font-size:11px;padding:2px 8px;"
+              onclick="document.getElementById('ep-upload-${exp.id}').click()">+ Photo</button>
+            <input type="file" multiple accept="image/*" id="ep-upload-${exp.id}" style="display:none"
+              onchange="invUploadExpFile(${exp.id},'image',this)">
+          </div>
+          ${
+            images.length
+              ? `<div class="gallery">${images
+                  .map(
+                    (f) => `
+            <div class="gallery-item">
+              <img src="/files/${esc(f.path)}" alt="${esc(f.filename)}" loading="lazy"
+                onclick="openLightbox('/files/${esc(f.path)}','${esc(f.filename)}')">
+              <div class="img-name">${esc(f.filename)}</div>
+              <button class="img-del" title="Delete"
+                onclick="event.stopPropagation();invDeleteExpFile(${exp.id},${f.id})">✕</button>
+            </div>`,
+                  )
+                  .join("")}</div>`
+              : `<div style="font-size:12px;color:var(--fg-muted);">No photos</div>`
+          }
+        </div>
+
+        <!-- Data files -->
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span class="sec-label">Data Files</span>
+            <button style="font-size:11px;padding:2px 8px;"
+              onclick="document.getElementById('ed-upload-${exp.id}').click()">+ File</button>
+            <input type="file" multiple id="ed-upload-${exp.id}" style="display:none"
+              onchange="invUploadExpFile(${exp.id},'data',this)">
+          </div>
+          ${
+            dataFiles.length
+              ? `<div class="file-list">${dataFiles
+                  .map(
+                    (f) => `
+            <div class="file-row">
+              <span class="fname">${esc(f.filename)}</span>
+              <a href="/files/${esc(f.path)}" download="${esc(f.filename)}">↓</a>
+              <button class="f-del" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
+            </div>`,
+                  )
+                  .join("")}</div>`
+              : `<div style="font-size:12px;color:var(--fg-muted);">No data files</div>`
+          }
+        </div>
+      </div>`;
+      })
+      .join("")}`;
+      }
+
+      async function invUploadSamplePhoto(sampleId, input) {
+        for (const file of Array.from(input.files)) {
+          const fd = new FormData();
+          fd.append("file", file);
+          await api(`/api/samples/${sampleId}/files`, {
+            method: "POST",
+            body: fd,
+          });
+        }
+        input.value = "";
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      async function invDeleteSamplePhoto(sampleId, fileId) {
+        if (!confirm("Delete this photo?")) return;
+        await api(`/api/samples/${sampleId}/files/${fileId}`, {
+          method: "DELETE",
+        });
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      async function invUploadExpFile(expId, fileType, input) {
+        for (const file of Array.from(input.files)) {
+          const fd = new FormData();
+          fd.append("file", file);
+          await fetch(`/api/experiments/${expId}/files?file_type=${fileType}`, {
+            method: "POST",
+            body: fd,
+          });
+        }
+        input.value = "";
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      async function invDeleteExpFile(expId, fileId) {
+        if (!confirm("Delete this file?")) return;
+        await fetch(`/api/experiments/${expId}/files/${fileId}`, {
+          method: "DELETE",
+        });
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      function invStartEditNote(expId) {
+        const view = document.getElementById(`exp-notes-view-${expId}`);
+        const edit = document.getElementById(`exp-notes-edit-${expId}`);
+        view.style.display = "none";
+        edit.style.display = "";
+        document.getElementById(`exp-notes-ta-${expId}`).focus();
+      }
+
+      function invCancelNote(expId) {
+        const exp = inv.current?.experiments.find((e) => e.id === expId);
+        document.getElementById(`exp-notes-ta-${expId}`).value =
+          exp?.notes || "";
+        document.getElementById(`exp-notes-view-${expId}`).style.display = "";
+        document.getElementById(`exp-notes-edit-${expId}`).style.display =
+          "none";
+      }
+
+      async function invSaveNote(expId) {
+        const exp = inv.current?.experiments.find((e) => e.id === expId);
+        if (!exp) return;
+        const body = document.getElementById(`exp-notes-ta-${expId}`).value;
+        await api(`/api/experiments/${expId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sample_id: exp.sample_id,
+            type: exp.type,
+            exp_date: exp.exp_date,
+            notes: body,
+          }),
+        });
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      async function invDeleteMeasurement(expId) {
+        if (!confirm("Delete this measurement and all attached files?")) return;
+        await api(`/api/experiments/${expId}`, { method: "DELETE" });
+        if (inv.current) await invSelectSample(inv.current.id);
+      }
+
+      async function triggerScan() {
+        const st = document.getElementById("inv-scan-status");
+        st.textContent = "Scanning…";
+        try {
+          const r = await api("/api/scan", { method: "POST" });
+          st.textContent = `+${r.samples}s +${r.experiments}e +${r.files}f`;
+          await invLoadFilters();
+          await invLoadSamples();
+          if (inv.current) await invSelectSample(inv.current.id);
+        } catch (e) {
+          st.textContent = "Error";
+        }
+      }
+
+      // ─ Add sample modal ─
+      function openAddSample() {
+        modalOpen(
+          "Add Sample",
+          `
+    <div class="form-row"><label>Name *</label><input id="f-name" placeholder="4Br-Mn-BA-001"></div>
+    <div class="form-row"><label>Compound *</label><input id="f-compound" placeholder="4Br-Mn-BA"></div>
+    <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date"></div>
+    <div class="form-row"><label>Batch</label><input id="f-batch"></div>
+    <div class="form-row"><label>Box</label><input id="f-box"></div>
+    <div class="form-row"><label>Crystal size</label><input id="f-size" placeholder="0.5 x 0.3 x 0.1 mm"></div>
+    <div class="form-row"><label>Notes</label><textarea id="f-notes"></textarea></div>
+  `,
+          async () => {
+            const payload = {
+              name: document.getElementById("f-name").value.trim(),
+              compound: document.getElementById("f-compound").value.trim(),
+              synthesis_date: document.getElementById("f-date").value || null,
+              batch: document.getElementById("f-batch").value.trim() || null,
+              box: document.getElementById("f-box").value.trim() || null,
+              crystal_size:
+                document.getElementById("f-size").value.trim() || null,
+              notes: document.getElementById("f-notes").value.trim() || null,
+            };
+            if (!payload.name || !payload.compound) return;
+            await api("/api/samples", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            closeModal();
+            await invLoadFilters();
+            await invLoadSamples();
+          },
+        );
+      }
+
+      function openEditSample() {
+        const s = inv.current;
+        modalOpen(
+          "Edit Sample",
+          `
+    <div class="form-row"><label>Compound *</label><input id="f-compound" value="${esc(s.compound)}"></div>
+    <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date" value="${s.synthesis_date || ""}"></div>
+    <div class="form-row"><label>Batch</label><input id="f-batch" value="${esc(s.batch || "")}"></div>
+    <div class="form-row"><label>Box</label><input id="f-box" value="${esc(s.box || "")}"></div>
+    <div class="form-row"><label>Crystal size</label><input id="f-size" value="${esc(s.crystal_size || "")}"></div>
+    <div class="form-row"><label>Notes</label><textarea id="f-notes">${esc(s.notes || "")}</textarea></div>
+  `,
+          async () => {
+            const payload = {
+              name: s.name,
+              compound: document.getElementById("f-compound").value.trim(),
+              synthesis_date: document.getElementById("f-date").value || null,
+              batch: document.getElementById("f-batch").value.trim() || null,
+              box: document.getElementById("f-box").value.trim() || null,
+              crystal_size:
+                document.getElementById("f-size").value.trim() || null,
+              notes: document.getElementById("f-notes").value.trim() || null,
+            };
+            await api(`/api/samples/${s.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            closeModal();
+            await invLoadSamples();
+            await invSelectSample(s.id);
+          },
+        );
+      }
+
+      function openAddExperiment() {
+        const s = inv.current;
+        modalOpen(
+          "Add Experiment",
+          `
+    <div class="form-row"><label>Type *</label>
+      <select id="f-exp-type">
+        <option value="ppms-vsm">PPMS-VSM</option><option value="ppms-hc">PPMS-HC</option>
+        <option value="pxrd">PXRD</option><option value="sxrd">SXRD</option><option value="microscopy">Microscopy</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Date</label><input id="f-exp-date" type="date"></div>
+    <div class="form-row"><label>Notes</label><textarea id="f-exp-notes"></textarea></div>
+  `,
+          async () => {
+            const payload = {
+              sample_id: s.id,
+              type: document.getElementById("f-exp-type").value,
+              exp_date: document.getElementById("f-exp-date").value || null,
+              notes:
+                document.getElementById("f-exp-notes").value.trim() || null,
+            };
+            await api("/api/experiments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            closeModal();
+            await invSelectSample(s.id);
+          },
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // PAGE 2 — VISUALIZATION
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const viz = { files: [], selected: new Set(), fileModes: {} };
+      let _vizLoaded = false,
+        _vizPlotted = false;
+
+      async function vizInit() {
+        _vizLoaded = true;
+        // Populate sample filter
+        try {
+          const samples = await api("/api/samples");
+          const sel = document.getElementById("viz-sample-filter");
+          sel.innerHTML =
+            '<option value="">All samples</option>' +
+            samples
+              .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`)
+              .join("");
+        } catch (_) {}
+
+        document
+          .getElementById("viz-select-all")
+          .addEventListener("change", function () {
+            document
+              .querySelectorAll("#viz-tbody input[type=checkbox]")
+              .forEach((cb) => {
+                cb.checked = this.checked;
+                cb.dispatchEvent(new Event("change"));
+              });
+          });
+
+        await vizLoadFiles();
+      }
+
+      async function vizLoadFiles() {
+        const type = document.getElementById("viz-exp-type").value;
+        const sampleId = document.getElementById("viz-sample-filter").value;
+        const p = new URLSearchParams({ exp_type: type });
+        if (sampleId) p.set("sample_id", sampleId);
+
+        vizSetStatus("Loading…", "busy");
+        try {
+          viz.files = await api("/api/files?" + p);
+          viz.selected.clear();
+          viz.fileModes = {};
+          viz.files.forEach((f) => {
+            viz.fileModes[f.id] = type.startsWith("ppms") ? "MH" : "";
+          });
+          vizRenderTable();
+          vizSetStatus(
+            `${viz.files.length} file${viz.files.length !== 1 ? "s" : ""} found.`,
+            "ready",
+          );
+        } catch (e) {
+          vizSetStatus("Error loading files.", "error");
+        }
+      }
+
+      function vizRenderTable() {
+        const tbody = document.getElementById("viz-tbody");
+        document.getElementById("viz-plot-btn").disabled =
+          viz.selected.size === 0;
+
+        if (!viz.files.length) {
+          tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--fg-muted);">No files</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = viz.files
+          .map((f) => {
+            const isPpms = document
+              .getElementById("viz-exp-type")
+              .value.startsWith("ppms");
+            const modeCtrl = isPpms
+              ? `
+      <div class="mode-group">
+        ${["MT", "MH"]
+          .map(
+            (m) => `
+          <label><input type="radio" name="vm-${f.id}" value="${m}" ${viz.fileModes[f.id] === m ? "checked" : ""}
+            onchange="viz.fileModes[${f.id}]='${m}'"> ${m}</label>
+        `,
+          )
+          .join("")}
+      </div>`
+              : '<span style="color:var(--fg-muted);font-size:11px;">—</span>';
+
+            return `<tr id="vrow-${f.id}" ${viz.selected.has(f.id) ? 'class="selected"' : ""}>
+      <td>
+        <span class="fname">${esc(f.filename)}</span>
+        <span class="fsample">${esc(f.sample_name)}</span>
+      </td>
+      <td>${modeCtrl}</td>
+      <td style="text-align:center;">
+        <input type="checkbox" ${viz.selected.has(f.id) ? "checked" : ""}
+          onchange="vizToggleFile(${f.id}, this.checked)">
+      </td>
+    </tr>`;
+          })
+          .join("");
+      }
+
+      function vizToggleFile(id, checked) {
+        if (checked) viz.selected.add(id);
+        else viz.selected.delete(id);
+        document
+          .getElementById("vrow-" + id)
+          ?.classList.toggle("selected", checked);
+        document.getElementById("viz-plot-btn").disabled =
+          viz.selected.size === 0;
+        vizSyncSelectAll();
+      }
+
+      function vizSyncSelectAll() {
+        const cbs = Array.from(
+          document.querySelectorAll("#viz-tbody input[type=checkbox]"),
+        );
+        const n = cbs.filter((c) => c.checked).length;
+        const sa = document.getElementById("viz-select-all");
+        sa.indeterminate = n > 0 && n < cbs.length;
+        sa.checked = n === cbs.length && cbs.length > 0;
+      }
+
+      async function vizRenderPlot() {
+        if (!viz.selected.size) return;
+        vizSetStatus("Rendering…", "busy");
+
+        const type = document.getElementById("viz-exp-type").value;
+        const ids = Array.from(viz.selected);
+
+        // Check mode consistency for PPMS
+        if (type.startsWith("ppms")) {
+          const modes = new Set(ids.map((id) => viz.fileModes[id]));
+          if (modes.size > 1) {
+            vizSetStatus(
+              "Mixed modes (MT & MH) — select one mode only.",
+              "error",
+            );
+            return;
+          }
+        }
+
+        const mode = type.startsWith("ppms")
+          ? viz.fileModes[ids[0]]
+          : undefined;
+        const p = mode ? `?mode=${mode}` : "";
+
+        try {
+          const data = await api(`/api/plot${p}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ids),
+          });
+          drawPlotly(document.getElementById("viz-plot"), data);
+          _vizPlotted = true;
+          vizSetStatus(
+            `Plotted ${ids.length} file${ids.length !== 1 ? "s" : ""}.`,
+            "ready",
+          );
+        } catch (e) {
+          vizSetStatus("Plot error: " + e.message, "error");
+        }
+      }
+
+      function vizClearPlot() {
+        Plotly.purge(document.getElementById("viz-plot"));
+        _vizPlotted = false;
+        vizSetStatus("Plot cleared.", "ready");
+      }
+
+      function vizSetStatus(msg, cls) {
+        const el = document.getElementById("viz-status");
+        el.textContent = msg;
+        el.className = cls || "";
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // PAGE 3 — NOTES
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      const notes = { list: [], current: null, dirty: false, samples: [] };
+      let _notesLoaded = false;
+      let _noteSaveTimer = null;
+
+      async function notesInit() {
+        _notesLoaded = true;
+        notes.samples = await api("/api/samples").catch(() => []);
+        await notesLoadList();
+      }
+
+      async function notesLoadList(q = "") {
+        const p = q ? "?q=" + encodeURIComponent(q) : "";
+        notes.list = await api("/api/notes" + p).catch(() => []);
+        notesRenderList();
+      }
+
+      function notesRenderList() {
+        const list = document.getElementById("notes-list");
+        if (!notes.list.length) {
+          list.innerHTML =
+            '<div class="placeholder" style="padding:20px;text-align:center;color:var(--fg-muted);">No notes yet</div>';
+          return;
+        }
+        list.innerHTML = notes.list
+          .map(
+            (n) => `
+    <div class="note-item${notes.current && notes.current.id === n.id ? " active" : ""}" onclick="notesSelect(${n.id})">
+      <div class="n-title">${esc(n.title) || '<em style="color:var(--fg-muted)">Untitled</em>'}</div>
+      <div class="n-date">${fmtDate(n.updated_at)}</div>
+      <div class="n-preview">${esc(notesStripMentions(n.body).slice(0, 80))}</div>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function notesStripMentions(body) {
+        return (body || "")
+          .replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1")
+          .replace(/@(\S+)/g, "@$1");
+      }
+
+      async function notesSelect(id) {
+        if (notes.dirty && !confirm("Discard unsaved changes?")) return;
+        notes.current = await api(`/api/notes/${id}`);
+        notes.dirty = false;
+        notesRenderEditor();
+        notesRenderList();
+      }
+
+      function notesRenderEditor() {
+        const n = notes.current;
+        document.getElementById("notes-placeholder").style.display = "none";
+        document.getElementById("notes-editor-wrap").style.display = "flex";
+        document.getElementById("note-title-input").value = n.title || "";
+        document.getElementById("note-body").value = n.body || "";
+        document.getElementById("note-save-status").textContent = "";
+        noteSetTab("edit");
+      }
+
+      async function createNewNote() {
+        if (notes.dirty && !confirm("Discard unsaved changes?")) return;
+        const n = await api("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "New note", body: "" }),
+        });
+        notes.list.unshift(n);
+        notes.current = n;
+        notes.dirty = false;
+        notesRenderList();
+        notesRenderEditor();
+        setTimeout(
+          () => document.getElementById("note-title-input").focus(),
+          50,
+        );
+      }
+
+      function noteMarkDirty() {
+        notes.dirty = true;
+        document.getElementById("note-save-status").textContent = "● unsaved";
+        clearTimeout(_noteSaveTimer);
+        _noteSaveTimer = setTimeout(noteSave, 2000); // autosave after 2s idle
+      }
+
+      async function noteSave() {
+        if (!notes.current) return;
+        clearTimeout(_noteSaveTimer);
+        const title =
+          document.getElementById("note-title-input").value.trim() ||
+          "Untitled";
+        const body = document.getElementById("note-body").value;
+        try {
+          const updated = await api(`/api/notes/${notes.current.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, body }),
+          });
+          notes.current = updated;
+          notes.dirty = false;
+          document.getElementById("note-save-status").textContent = "Saved";
+          setTimeout(() => {
+            if (
+              document.getElementById("note-save-status").textContent ===
+              "Saved"
+            )
+              document.getElementById("note-save-status").textContent = "";
+          }, 2000);
+          // Update list entry
+          const idx = notes.list.findIndex((n) => n.id === updated.id);
+          if (idx >= 0) notes.list[idx] = updated;
+          else notes.list.unshift(updated);
+          notesRenderList();
+        } catch (e) {
+          document.getElementById("note-save-status").textContent =
+            "Save failed";
+        }
+      }
+
+      async function deleteCurrentNote() {
+        if (!notes.current) return;
+        if (!confirm(`Delete "${notes.current.title}"?`)) return;
+        clearTimeout(_noteSaveTimer);
+        await api(`/api/notes/${notes.current.id}`, { method: "DELETE" });
+        notes.list = notes.list.filter((n) => n.id !== notes.current.id);
+        notes.current = null;
+        notes.dirty = false;
+        document.getElementById("notes-placeholder").style.display = "flex";
+        document.getElementById("notes-editor-wrap").style.display = "none";
+        notesRenderList();
+      }
+
+      function notesApplySearch() {
+        const q = document.getElementById("notes-search-input").value.trim();
+        notesLoadList(q);
+      }
+
+      // ─ Tab switching ─
+      function noteSetTab(tab) {
+        document
+          .querySelectorAll(".note-tab")
+          .forEach((t, i) =>
+            t.classList.toggle("active", i === (tab === "edit" ? 0 : 1)),
+          );
+        const body = document.getElementById("note-body");
+        const render = document.getElementById("note-render");
+        if (tab === "edit") {
+          body.style.display = "";
+          render.style.display = "none";
+        } else {
+          body.style.display = "none";
+          render.style.display = "block";
+          render.innerHTML = noteRenderBody(
+            document.getElementById("note-body").value,
+          );
+        }
+      }
+
+      function noteRenderBody(text) {
+        if (!text)
+          return '<p style="color:var(--fg-muted)">Nothing written yet.</p>';
+
+        // 1. Extract @[label](sample:id) mentions before Markdown parsing
+        //    so marked.js doesn't mangle the custom syntax.
+        const chips = [];
+        const ph = (i) => `\x00CHIP${i}\x00`;
+        let safe = text.replace(
+          /@\[([^\]]+)\]\(sample:(\d+)\)/g,
+          (_, label, id) => {
+            const i = chips.length;
+            chips.push(
+              `<span class="mention-chip" onclick="invJumpTo(${id})">@${esc(label)}</span>`,
+            );
+            return ph(i);
+          },
+        );
+
+        // 2. Render Markdown
+        let html = marked.parse(safe, { breaks: true, gfm: true });
+
+        // 3. Re-insert mention chips
+        chips.forEach((chip, i) => {
+          html = html.split(ph(i)).join(chip);
+        });
+
+        return html;
+      }
+
+      // Jump to sample from note @mention
+      function invJumpTo(sampleId) {
+        showPage("inventory");
+        invSelectSample(sampleId);
+      }
+
+      // ─ @mention autocomplete ─
+      let _mentionStart = -1;
+
+      function noteHandleMention(e) {
+        const ta = document.getElementById("note-body");
+        const pos = ta.selectionStart;
+        const text = ta.value;
+
+        // Find the @ that started this mention word
+        let atPos = -1;
+        for (let i = pos - 1; i >= 0; i--) {
+          if (text[i] === "@") {
+            atPos = i;
+            break;
+          }
+          if (text[i] === " " || text[i] === "\n") break;
+        }
+
+        if (atPos === -1) {
+          mentionHide();
+          return;
+        }
+
+        _mentionStart = atPos;
+        const query = text.slice(atPos + 1, pos).toLowerCase();
+        const matches = notes.samples
+          .filter((s) => s.name.toLowerCase().includes(query))
+          .slice(0, 8);
+
+        if (!matches.length) {
+          mentionHide();
+          return;
+        }
+
+        // Position dropdown near cursor
+        const coords = getCaretCoords(ta, atPos);
+        const dd = document.getElementById("mention-dropdown");
+        dd.style.display = "block";
+        dd.style.left = coords.x + "px";
+        dd.style.top = coords.y + "px";
+        dd.innerHTML = matches
+          .map(
+            (s, i) => `
+    <div class="mention-option${i === 0 ? " focused" : ""}" data-id="${s.id}" data-name="${esc(s.name)}"
+         onclick="mentionInsert(${s.id}, '${esc(s.name)}')">
+      <span>@${esc(s.name)}</span>
+      <span class="mo-type">${esc(s.compound || "")}</span>
+    </div>`,
+          )
+          .join("");
+      }
+
+      function noteHandleMentionKey(e) {
+        const dd = document.getElementById("mention-dropdown");
+        if (dd.style.display === "none" || !dd.children.length) return;
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const focused = dd.querySelector(".focused");
+          const items = Array.from(dd.children);
+          const idx = items.indexOf(focused);
+          items.forEach((i) => i.classList.remove("focused"));
+          const next =
+            e.key === "ArrowDown"
+              ? (idx + 1) % items.length
+              : (idx - 1 + items.length) % items.length;
+          items[next].classList.add("focused");
+        } else if (e.key === "Enter" || e.key === "Tab") {
+          const focused = dd.querySelector(".focused");
+          if (focused) {
+            e.preventDefault();
+            mentionInsert(parseInt(focused.dataset.id), focused.dataset.name);
+          }
+        } else if (e.key === "Escape") {
+          mentionHide();
+        }
+      }
+
+      function mentionInsert(id, name) {
+        const ta = document.getElementById("note-body");
+        const pos = ta.selectionStart;
+        const text = ta.value;
+        const before = text.slice(0, _mentionStart);
+        const after = text.slice(pos);
+        const insert = `@[${name}](sample:${id})`;
+        ta.value = before + insert + after;
+        const newPos = before.length + insert.length;
+        ta.setSelectionRange(newPos, newPos);
+        mentionHide();
+        noteMarkDirty();
+      }
+
+      function mentionHide() {
+        document.getElementById("mention-dropdown").style.display = "none";
+      }
+
+      // Approximate caret pixel position in textarea
+      function getCaretCoords(ta, pos) {
+        const div = document.createElement("div");
+        const style = window.getComputedStyle(ta);
+        [
+          "fontFamily",
+          "fontSize",
+          "fontWeight",
+          "lineHeight",
+          "padding",
+          "border",
+          "width",
+          "boxSizing",
+          "whiteSpace",
+          "wordBreak",
+        ].forEach((p) => {
+          div.style[p] = style[p];
+        });
+        div.style.position = "absolute";
+        div.style.visibility = "hidden";
+        div.style.top = "0";
+        div.style.left = "0";
+        div.style.overflow = "hidden";
+        div.style.height = "auto";
+        div.style.whiteSpace = "pre-wrap";
+        document.body.appendChild(div);
+        div.textContent = ta.value.slice(0, pos);
+        const span = document.createElement("span");
+        span.textContent = "|";
+        div.appendChild(span);
+        const rect = ta.getBoundingClientRect();
+        const spanRect = span.getBoundingClientRect();
+        document.body.removeChild(div);
+        const scrollTop = ta.scrollTop;
+        return {
+          x: rect.left + (spanRect.left - div.getBoundingClientRect().left),
+          y:
+            rect.top +
+            span.offsetTop -
+            scrollTop +
+            parseFloat(style.lineHeight) +
+            2,
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // SHARED — PLOTLY HELPER
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      function drawPlotly(el, data) {
+        const dark =
+          document.documentElement.getAttribute("data-theme") === "dark";
+        const bg = dark ? "#1e1e21" : "#ffffff";
+        const fg = dark ? "#cccccc" : "#222222";
+        const grid = dark ? "#444444" : "#e0e0e0";
+        Plotly.react(
+          el,
+          data.traces,
+          {
+            paper_bgcolor: bg,
+            plot_bgcolor: bg,
+            showlegend: true,
+            uirevision: "plot-ui",
+            font: {
+              color: fg,
+              family: "'Segoe UI', system-ui, Arial, sans-serif",
+              size: 12,
+            },
+            margin: { l: 85, r: 36, t: 36, b: 72, pad: 8 },
+            xaxis: {
+              title: data.xaxis,
+              gridcolor: grid,
+              linecolor: grid,
+              zerolinecolor: grid,
+            },
+            yaxis: {
+              title: data.yaxis,
+              gridcolor: grid,
+              linecolor: grid,
+              zerolinecolor: grid,
+            },
+            legend: { x: 1, xanchor: "right", y: 1 },
+            hovermode: "closest",
+          },
+          {
+            responsive: true,
+            editable: false,
+            displayModeBar: true,
+            edits: { legendPosition: true },
+          },
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // SHARED — MODAL, LIGHTBOX
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      let _modalSubmit = null;
+      function modalOpen(title, bodyHtml, onSubmit) {
+        document.getElementById("modal-title").textContent = title;
+        document.getElementById("modal-body").innerHTML = bodyHtml;
+        _modalSubmit = onSubmit;
+        document.getElementById("modal-submit").onclick = async () => {
+          try {
+            await _modalSubmit();
+          } catch (e) {
+            alert(e.message);
+          }
+        };
+        document.getElementById("modal-overlay").classList.add("open");
+        document.querySelector("#modal-body input")?.focus();
+      }
+      function closeModal(e) {
+        if (e && e.target !== document.getElementById("modal-overlay")) return;
+        document.getElementById("modal-overlay").classList.remove("open");
+      }
+
+      function openLightbox(src, alt) {
+        document.getElementById("lightbox-img").src = src;
+        document.getElementById("lightbox-img").alt = alt;
+        document.getElementById("lightbox").classList.add("open");
+      }
+      function closeLightbox() {
+        document.getElementById("lightbox").classList.remove("open");
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // RESIZABLE PANELS
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      (function initResizers() {
+        const MIN_W = 160;
+        const MAX_W = 600;
+        const STORAGE_KEY = "panel-widths";
+
+        // Restore saved widths
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          Object.entries(saved).forEach(([id, w]) => {
+            const el = document.getElementById(id);
+            if (el) el.style.width = w + "px";
+          });
+        } catch (_) {}
+
+        document.querySelectorAll(".resizer").forEach((resizer) => {
+          const targetId = resizer.dataset.target;
+          const leftPanel = document.getElementById(targetId);
+          if (!leftPanel) return;
+
+          let startX, startW;
+
+          resizer.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startW = leftPanel.getBoundingClientRect().width;
+            resizer.classList.add("dragging");
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+
+            function onMove(e) {
+              const dx = e.clientX - startX;
+              const newW = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
+              leftPanel.style.width = newW + "px";
+            }
+
+            function onUp() {
+              resizer.classList.remove("dragging");
+              document.body.style.cursor = "";
+              document.body.style.userSelect = "";
+              document.removeEventListener("mousemove", onMove);
+              document.removeEventListener("mouseup", onUp);
+
+              // Persist width
+              try {
+                const saved = JSON.parse(
+                  localStorage.getItem(STORAGE_KEY) || "{}",
+                );
+                saved[targetId] = parseInt(leftPanel.style.width);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+              } catch (_) {}
+
+              // Re-trigger Plotly resize if a plot is visible
+              window.dispatchEvent(new Event("resize"));
+            }
+
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

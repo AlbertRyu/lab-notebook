@@ -1,0 +1,12 @@
+[project]
+name = "lab-notebook"
+version = "0.1.0"
+description = "Sample-centric research lab notebook — FastAPI + SQLite backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "sqlmodel>=0.0.21",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6.0",
+]

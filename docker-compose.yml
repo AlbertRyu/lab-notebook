@@ -1,0 +1,16 @@
+services:
+  lab-notebook:
+    build: .
+    container_name: lab-notebook
+    ports:
+      - "8100:8000"
+    volumes:
+      - ./data:/data          # samples directory + SQLite DB
+      - ./frontend:/app/frontend  # hot-reload HTML without rebuild
+    restart: unless-stopped
+#    networks:
+#      - homelab
+
+#networks:
+#  homelab:
+#    external: true
