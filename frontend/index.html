@@ -205,6 +205,9 @@
         opacity: 0.4;
         cursor: default;
       }
+      body.readonly .auth-write {
+        display: none !important;
+      }
       button.primary {
         background: var(--accent);
         color: var(--accent-fg);
@@ -1140,6 +1143,13 @@
         </button>
         <div class="spacer"></div>
         <div class="nav-bottom">
+          <button
+            class="nav-btn"
+            id="nav-auth"
+            onclick="openAuthModal()"
+          >
+            🔒
+          </button>
           <button class="nav-btn" title="Toggle Theme" onclick="toggleTheme()">
             🌓
           </button>
@@ -1197,10 +1207,20 @@
                 >Sample Inventory</span
               >
               <div style="flex: 1"></div>
-              <button class="primary" onclick="openAddSample()">
+              <button
+                class="primary auth-write"
+                id="inv-add-sample-btn"
+                onclick="openAddSample()"
+              >
                 + Sample
               </button>
-              <button onclick="triggerScan()">Scan Folder</button>
+              <button
+                class="auth-write"
+                id="inv-scan-btn"
+                onclick="triggerScan()"
+              >
+                Scan Folder
+              </button>
             </div>
             <div
               id="inv-detail-placeholder"
@@ -1237,10 +1257,20 @@
                   >
                     <h2 id="detail-name"></h2>
                     <div style="display: flex; gap: 6px; flex-shrink: 0">
-                      <button onclick="openAddExperiment()">
+                      <button
+                        class="auth-write"
+                        id="detail-add-exp-btn"
+                        onclick="openAddExperiment()"
+                      >
                         + Experiment
                       </button>
-                      <button onclick="openEditSample()">Edit</button>
+                      <button
+                        class="auth-write"
+                        id="detail-edit-sample-btn"
+                        onclick="openEditSample()"
+                      >
+                        Edit
+                      </button>
                     </div>
                   </div>
                   <div class="meta-grid" id="detail-meta"></div>
@@ -1344,7 +1374,13 @@
               <span style="font-weight: 700; font-size: 13px; flex: 1"
                 >Notes</span
               >
-              <button class="primary" onclick="createNewNote()">+ Note</button>
+              <button
+                class="primary auth-write"
+                id="notes-add-btn"
+                onclick="createNewNote()"
+              >
+                + Note
+              </button>
             </div>
             <div id="notes-search">
               <input
@@ -1389,14 +1425,23 @@
               "
             >
               <div id="note-tabs">
-                <div class="note-tab active" onclick="noteSetTab('edit')">
+                <div
+                  class="note-tab auth-write active"
+                  id="note-tab-edit"
+                  onclick="noteSetTab('edit')"
+                >
                   Edit
                 </div>
-                <div class="note-tab" onclick="noteSetTab('preview')">
+                <div
+                  class="note-tab"
+                  id="note-tab-preview"
+                  onclick="noteSetTab('preview')"
+                >
                   Preview
                 </div>
                 <div style="flex: 1"></div>
                 <button
+                  class="auth-write"
                   id="note-pin-btn"
                   style="margin: 4px 0; padding: 3px 8px"
                   onclick="noteTogglePin()"
@@ -1404,7 +1449,8 @@
                   Pin
                 </button>
                 <button
-                  class="danger"
+                  class="danger auth-write"
+                  id="note-delete-btn"
                   style="margin: 4px 8px; padding: 3px 8px"
                   onclick="deleteCurrentNote()"
                 >
@@ -1432,7 +1478,7 @@
                 </div>
                 <div id="note-footer">
                   <button
-                    class="primary"
+                    class="primary auth-write"
                     id="note-save-btn"
                     onclick="noteSave()"
                   >
@@ -1475,6 +1521,8 @@
       // GLOBAL STATE & UTILS
       // ═══════════════════════════════════════════════════════════════════════════
 
+      const auth = { authenticated: false };
+
       const savedTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", savedTheme);
 
@@ -1490,9 +1538,102 @@
 
       async function api(path, opts = {}) {
         const res = await fetch(path, opts);
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          const msg = await res.text();
+          if (res.status === 401) {
+            auth.authenticated = false;
+            applyAuthUi();
+          }
+          throw new Error(msg || `HTTP ${res.status}`);
+        }
         if (res.status === 204) return null;
         return res.json();
+      }
+
+      async function authInit() {
+        try {
+          const me = await api("/api/auth/me");
+          auth.authenticated = !!me.authenticated;
+        } catch (_) {
+          auth.authenticated = false;
+        }
+        applyAuthUi();
+      }
+
+      function applyAuthUi() {
+        const lockBtn = document.getElementById("nav-auth");
+        if (lockBtn) {
+          lockBtn.textContent = auth.authenticated ? "🔓" : "🔒";
+        }
+        document.body.classList.toggle("readonly", !auth.authenticated);
+
+        [
+          "inv-add-sample-btn",
+          "inv-scan-btn",
+          "detail-add-exp-btn",
+          "detail-edit-sample-btn",
+          "notes-add-btn",
+          "note-save-btn",
+          "note-pin-btn",
+          "note-delete-btn",
+          "note-title-input",
+          "note-body",
+        ].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = !auth.authenticated;
+        });
+
+        const noteTabEdit = document.getElementById("note-tab-edit");
+        if (noteTabEdit)
+          noteTabEdit.style.display = auth.authenticated ? "" : "none";
+
+        if (notes.current) {
+          noteSetTab(auth.authenticated ? "edit" : "preview");
+        }
+      }
+
+      function ensureWriteAuth() {
+        if (auth.authenticated) return true;
+        alert("Read-only mode. Please unlock editing with password first.");
+        openAuthModal();
+        return false;
+      }
+
+      function openAuthModal() {
+        if (auth.authenticated) {
+          authLogout();
+          return;
+        }
+        modalOpen(
+          "Unlock Editing",
+          `
+    <div class="form-row">
+      <label>Password</label>
+      <input id="auth-password" type="password" placeholder="Enter password" autocomplete="current-password">
+    </div>
+  `,
+          async () => {
+            const password = document.getElementById("auth-password").value;
+            await authLogin(password);
+            closeModal();
+          },
+        );
+      }
+
+      async function authLogin(password) {
+        await api("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        auth.authenticated = true;
+        applyAuthUi();
+      }
+
+      async function authLogout() {
+        await api("/api/auth/logout", { method: "POST" });
+        auth.authenticated = false;
+        applyAuthUi();
       }
 
       function esc(s) {
@@ -1545,6 +1686,7 @@
       };
 
       (async function invInit() {
+        await authInit();
         await invLoadFilters();
         await invLoadSamples();
       })();
@@ -1655,7 +1797,7 @@
         el.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
       <span class="sec-label">Sample Photos</span>
-      <button style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('sp-upload').click()">+ Photo</button>
+      <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('sp-upload').click()">+ Photo</button>
       <input type="file" multiple accept="image/*" id="sp-upload" style="display:none"
         onchange="invUploadSamplePhoto(${s.id},this)">
     </div>
@@ -1668,7 +1810,7 @@
         <img src="/files/${esc(f.path)}?v=${f.id}" alt="${esc(f.filename)}" loading="lazy"
           onclick="openLightbox('/files/${esc(f.path)}?v=${f.id}','${esc(f.filename)}')">
         <div class="img-name">${esc(f.filename)}</div>
-        <button class="img-del" title="Delete" onclick="event.stopPropagation();invDeleteSamplePhoto(${s.id},${f.id})">✕</button>
+        <button class="img-del auth-write" title="Delete" onclick="event.stopPropagation();invDeleteSamplePhoto(${s.id},${f.id})">✕</button>
       </div>`,
             )
             .join("")}</div>`
@@ -1706,7 +1848,7 @@
           <span class="tag tag-${exp.type}">${label}</span>
           ${exp.exp_date ? `<span style="font-size:11px;color:var(--fg-muted);">${exp.exp_date}</span>` : ""}
           <div style="flex:1"></div>
-          <button class="danger" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
+          <button class="danger auth-write" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
         </div>
 
         <!-- Notes -->
@@ -1718,7 +1860,7 @@
           <div id="exp-notes-edit-${exp.id}" style="display:none;">
             <textarea class="exp-notes-input" id="exp-notes-ta-${exp.id}">${esc(exp.notes || "")}</textarea>
             <div style="display:flex;gap:6px;margin-top:4px;">
-              <button style="font-size:11px;padding:3px 8px;" class="primary"
+              <button style="font-size:11px;padding:3px 8px;" class="primary auth-write"
                 onclick="invSaveNote(${exp.id})">Save</button>
               <button style="font-size:11px;padding:3px 8px;"
                 onclick="invCancelNote(${exp.id})">Cancel</button>
@@ -1730,7 +1872,7 @@
         <div style="margin-bottom:10px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
             <span class="sec-label">Photos</span>
-            <button style="font-size:11px;padding:2px 8px;"
+            <button class="auth-write" style="font-size:11px;padding:2px 8px;"
               onclick="document.getElementById('ep-upload-${exp.id}').click()">+ Photo</button>
             <input type="file" multiple accept="image/*" id="ep-upload-${exp.id}" style="display:none"
               onchange="invUploadExpFile(${exp.id},'image',this)">
@@ -1744,7 +1886,7 @@
               <img src="/files/${esc(f.path)}" alt="${esc(f.filename)}" loading="lazy"
                 onclick="openLightbox('/files/${esc(f.path)}','${esc(f.filename)}')">
               <div class="img-name">${esc(f.filename)}</div>
-              <button class="img-del" title="Delete"
+              <button class="img-del auth-write" title="Delete"
                 onclick="event.stopPropagation();invDeleteExpFile(${exp.id},${f.id})">✕</button>
             </div>`,
                   )
@@ -1757,7 +1899,7 @@
         <div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
             <span class="sec-label">Data Files</span>
-            <button style="font-size:11px;padding:2px 8px;"
+            <button class="auth-write" style="font-size:11px;padding:2px 8px;"
               onclick="document.getElementById('ed-upload-${exp.id}').click()">+ File</button>
             <input type="file" multiple id="ed-upload-${exp.id}" style="display:none"
               onchange="invUploadExpFile(${exp.id},'data',this)">
@@ -1770,7 +1912,7 @@
             <div class="file-row">
               <span class="fname">${esc(f.filename)}</span>
               <a href="/files/${esc(f.path)}" download="${esc(f.filename)}">↓</a>
-              <button class="f-del" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
+              <button class="f-del auth-write" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
             </div>`,
                   )
                   .join("")}</div>`
@@ -1783,6 +1925,7 @@
       }
 
       async function invUploadSamplePhoto(sampleId, input) {
+        if (!ensureWriteAuth()) return;
         for (const file of Array.from(input.files)) {
           const fd = new FormData();
           fd.append("file", file);
@@ -1796,6 +1939,7 @@
       }
 
       async function invDeleteSamplePhoto(sampleId, fileId) {
+        if (!ensureWriteAuth()) return;
         if (!confirm("Delete this photo?")) return;
         await api(`/api/samples/${sampleId}/files/${fileId}`, {
           method: "DELETE",
@@ -1804,10 +1948,11 @@
       }
 
       async function invUploadExpFile(expId, fileType, input) {
+        if (!ensureWriteAuth()) return;
         for (const file of Array.from(input.files)) {
           const fd = new FormData();
           fd.append("file", file);
-          await fetch(`/api/experiments/${expId}/files?file_type=${fileType}`, {
+          await api(`/api/experiments/${expId}/files?file_type=${fileType}`, {
             method: "POST",
             body: fd,
           });
@@ -1817,8 +1962,9 @@
       }
 
       async function invDeleteExpFile(expId, fileId) {
+        if (!ensureWriteAuth()) return;
         if (!confirm("Delete this file?")) return;
-        await fetch(`/api/experiments/${expId}/files/${fileId}`, {
+        await api(`/api/experiments/${expId}/files/${fileId}`, {
           method: "DELETE",
         });
         if (inv.current) await invSelectSample(inv.current.id);
@@ -1842,6 +1988,7 @@
       }
 
       async function invSaveNote(expId) {
+        if (!ensureWriteAuth()) return;
         const exp = inv.current?.experiments.find((e) => e.id === expId);
         if (!exp) return;
         const body = document.getElementById(`exp-notes-ta-${expId}`).value;
@@ -1859,12 +2006,14 @@
       }
 
       async function invDeleteMeasurement(expId) {
+        if (!ensureWriteAuth()) return;
         if (!confirm("Delete this measurement and all attached files?")) return;
         await api(`/api/experiments/${expId}`, { method: "DELETE" });
         if (inv.current) await invSelectSample(inv.current.id);
       }
 
       async function triggerScan() {
+        if (!ensureWriteAuth()) return;
         const st = document.getElementById("inv-scan-status");
         st.textContent = "Scanning…";
         try {
@@ -1880,6 +2029,7 @@
 
       // ─ Add sample modal ─
       function openAddSample() {
+        if (!ensureWriteAuth()) return;
         modalOpen(
           "Add Sample",
           `
@@ -1916,6 +2066,7 @@
       }
 
       function openEditSample() {
+        if (!ensureWriteAuth()) return;
         const s = inv.current;
         modalOpen(
           "Edit Sample",
@@ -1951,6 +2102,7 @@
       }
 
       function openAddExperiment() {
+        if (!ensureWriteAuth()) return;
         const s = inv.current;
         modalOpen(
           "Add Experiment",
@@ -2226,10 +2378,11 @@
           ? "Unpin"
           : "Pin";
         document.getElementById("note-save-status").textContent = "";
-        noteSetTab("edit");
+        noteSetTab(auth.authenticated ? "edit" : "preview");
       }
 
       async function noteTogglePin() {
+        if (!ensureWriteAuth()) return;
         if (!notes.current) return;
         clearTimeout(_noteSaveTimer);
         const title =
@@ -2259,6 +2412,7 @@
       }
 
       async function createNewNote() {
+        if (!ensureWriteAuth()) return;
         if (notes.dirty && !confirm("Discard unsaved changes?")) return;
         const n = await api("/api/notes", {
           method: "POST",
@@ -2284,6 +2438,7 @@
       }
 
       async function noteSave() {
+        if (!ensureWriteAuth()) return;
         if (!notes.current) return;
         clearTimeout(_noteSaveTimer);
         const title =
@@ -2318,6 +2473,7 @@
       }
 
       async function deleteCurrentNote() {
+        if (!ensureWriteAuth()) return;
         if (!notes.current) return;
         if (!confirm(`Delete "${notes.current.title}"?`)) return;
         clearTimeout(_noteSaveTimer);
@@ -2337,11 +2493,11 @@
 
       // ─ Tab switching ─
       function noteSetTab(tab) {
-        document
-          .querySelectorAll(".note-tab")
-          .forEach((t, i) =>
-            t.classList.toggle("active", i === (tab === "edit" ? 0 : 1)),
-          );
+        const editTab = document.getElementById("note-tab-edit");
+        const previewTab = document.getElementById("note-tab-preview");
+        if (editTab) editTab.classList.toggle("active", tab === "edit");
+        if (previewTab)
+          previewTab.classList.toggle("active", tab === "preview");
         const body = document.getElementById("note-body");
         const render = document.getElementById("note-render");
         if (tab === "edit") {

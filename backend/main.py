@@ -1,4 +1,9 @@
 import os
+import json
+import hmac
+import base64
+import hashlib
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -6,12 +11,15 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Request,
+    Response,
     Query,
     UploadFile,
     File as FastAPIFile,
 )
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from database import create_db, get_session
@@ -41,8 +49,111 @@ app = FastAPI(title="Lab Notebook")
 DATA_DIR_PATH = Path(os.environ.get("DATA_DIR", "/data"))
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
+AUTH_COOKIE_NAME = "lab_notebook_auth"
+AUTH_TTL_SECONDS = int(os.environ.get("AUTH_TTL_SECONDS", "28800"))  # 8 hours
+AUTH_COOKIE_SECURE = os.environ.get("AUTH_COOKIE_SECURE", "false").lower() == "true"
+
+
+class AuthLogin(BaseModel):
+    password: str
+
+
+def _auth_secret() -> bytes:
+    return os.environ.get("AUTH_SECRET", "dev-secret-change-me").encode("utf-8")
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(s: str) -> bytes:
+    padding = "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode((s + padding).encode("ascii"))
+
+
+def _make_auth_token() -> str:
+    payload = {"exp": int(time.time()) + AUTH_TTL_SECONDS}
+    payload_b64 = _b64url_encode(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    )
+    sig = hmac.new(
+        _auth_secret(),
+        payload_b64.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    return f"{payload_b64}.{_b64url_encode(sig)}"
+
+
+def _is_valid_auth_token(token: str) -> bool:
+    try:
+        payload_b64, sig_b64 = token.split(".", 1)
+    except ValueError:
+        return False
+
+    expected_sig = hmac.new(
+        _auth_secret(), payload_b64.encode("ascii"), hashlib.sha256
+    ).digest()
+    try:
+        got_sig = _b64url_decode(sig_b64)
+    except Exception:
+        return False
+    if not hmac.compare_digest(got_sig, expected_sig):
+        return False
+
+    try:
+        payload = json.loads(_b64url_decode(payload_b64))
+    except Exception:
+        return False
+
+    exp = payload.get("exp")
+    return isinstance(exp, int) and exp > int(time.time())
+
+
+def _is_authenticated(request: Request) -> bool:
+    token = request.cookies.get(AUTH_COOKIE_NAME)
+    if not token:
+        return False
+    return _is_valid_auth_token(token)
+
+
+def require_write_auth(request: Request):
+    if not _is_authenticated(request):
+        raise HTTPException(401, "Authentication required for write operations")
+
 
 SEED_DIR = Path(__file__).parent.parent / "seed"
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    return {"authenticated": _is_authenticated(request)}
+
+
+@app.post("/api/auth/login")
+def auth_login(data: AuthLogin, response: Response):
+    configured_password = os.environ.get("LAB_NOTEBOOK_PASSWORD", "")
+    if not configured_password:
+        raise HTTPException(503, "LAB_NOTEBOOK_PASSWORD is not configured")
+
+    if not hmac.compare_digest(data.password, configured_password):
+        raise HTTPException(401, "Invalid password")
+
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=_make_auth_token(),
+        max_age=AUTH_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=AUTH_COOKIE_SECURE,
+        path="/",
+    )
+    return {"authenticated": True}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(response: Response):
+    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    return {"authenticated": False}
 
 
 @app.on_event("startup")
@@ -166,7 +277,11 @@ def get_sample(sample_id: int, session: Session = Depends(get_session)):
 
 
 @app.post("/api/samples", response_model=SampleRead, status_code=201)
-def create_sample(data: SampleCreate, session: Session = Depends(get_session)):
+def create_sample(
+    data: SampleCreate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     existing = session.exec(select(Sample).where(Sample.name == data.name)).first()
     if existing:
         raise HTTPException(409, f"Sample '{data.name}' already exists")
@@ -179,7 +294,10 @@ def create_sample(data: SampleCreate, session: Session = Depends(get_session)):
 
 @app.put("/api/samples/{sample_id}", response_model=SampleRead)
 def update_sample(
-    sample_id: int, data: SampleCreate, session: Session = Depends(get_session)
+    sample_id: int,
+    data: SampleCreate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
 ):
     sample = session.get(Sample, sample_id)
     if not sample:
@@ -193,7 +311,11 @@ def update_sample(
 
 
 @app.delete("/api/samples/{sample_id}", status_code=204)
-def delete_sample(sample_id: int, session: Session = Depends(get_session)):
+def delete_sample(
+    sample_id: int,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     sample = session.get(Sample, sample_id)
     if not sample:
         raise HTTPException(404, "Sample not found")
@@ -210,6 +332,7 @@ def delete_sample(sample_id: int, session: Session = Depends(get_session)):
 async def upload_sample_file(
     sample_id: int,
     file: UploadFile = FastAPIFile(...),
+    _: None = Depends(require_write_auth),
     session: Session = Depends(get_session),
 ):
     sample = session.get(Sample, sample_id)
@@ -231,7 +354,10 @@ async def upload_sample_file(
 
 @app.delete("/api/samples/{sample_id}/files/{file_id}", status_code=204)
 def delete_sample_file(
-    sample_id: int, file_id: int, session: Session = Depends(get_session)
+    sample_id: int,
+    file_id: int,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
 ):
     sf = session.get(SampleFile, file_id)
     if not sf or sf.sample_id != sample_id:
@@ -248,7 +374,11 @@ def delete_sample_file(
 
 
 @app.post("/api/experiments", response_model=ExperimentRead, status_code=201)
-def create_experiment(data: ExperimentCreate, session: Session = Depends(get_session)):
+def create_experiment(
+    data: ExperimentCreate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     if not session.get(Sample, data.sample_id):
         raise HTTPException(404, "Sample not found")
     exp = Experiment(**data.model_dump())
@@ -272,6 +402,7 @@ async def upload_file(
     exp_id: int,
     file: UploadFile = FastAPIFile(...),
     file_type: str = Query("data"),
+    _: None = Depends(require_write_auth),
     session: Session = Depends(get_session),
 ):
     exp = session.get(Experiment, exp_id)
@@ -303,7 +434,10 @@ async def upload_file(
 
 @app.put("/api/experiments/{exp_id}", response_model=ExperimentRead)
 def update_experiment(
-    exp_id: int, data: ExperimentCreate, session: Session = Depends(get_session)
+    exp_id: int,
+    data: ExperimentCreate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
 ):
     exp = session.get(Experiment, exp_id)
     if not exp:
@@ -330,7 +464,11 @@ def update_experiment(
 
 
 @app.delete("/api/experiments/{exp_id}", status_code=204)
-def delete_experiment(exp_id: int, session: Session = Depends(get_session)):
+def delete_experiment(
+    exp_id: int,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     exp = session.get(Experiment, exp_id)
     if not exp:
         raise HTTPException(404, "Experiment not found")
@@ -349,7 +487,10 @@ def delete_experiment(exp_id: int, session: Session = Depends(get_session)):
 
 @app.delete("/api/experiments/{exp_id}/files/{file_id}", status_code=204)
 def delete_experiment_file(
-    exp_id: int, file_id: int, session: Session = Depends(get_session)
+    exp_id: int,
+    file_id: int,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
 ):
     df = session.get(DataFile, file_id)
     if not df or df.experiment_id != exp_id:
@@ -437,7 +578,10 @@ def experiment_data(
 
 
 @app.post("/api/scan")
-def trigger_scan(session: Session = Depends(get_session)):
+def trigger_scan(
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     result = scanner.scan(session)
     return result
 
@@ -576,7 +720,11 @@ def list_notes(
 
 
 @app.post("/api/notes", response_model=NoteRead, status_code=201)
-def create_note(data: NoteCreate, session: Session = Depends(get_session)):
+def create_note(
+    data: NoteCreate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     now = _now()
     note = Note(
         title=data.title,
@@ -601,7 +749,10 @@ def get_note(note_id: int, session: Session = Depends(get_session)):
 
 @app.put("/api/notes/{note_id}", response_model=NoteRead)
 def update_note(
-    note_id: int, data: NoteUpdate, session: Session = Depends(get_session)
+    note_id: int,
+    data: NoteUpdate,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
 ):
     note = session.get(Note, note_id)
     if not note:
@@ -620,7 +771,11 @@ def update_note(
 
 
 @app.delete("/api/notes/{note_id}", status_code=204)
-def delete_note(note_id: int, session: Session = Depends(get_session)):
+def delete_note(
+    note_id: int,
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
     note = session.get(Note, note_id)
     if not note:
         raise HTTPException(404, "Note not found")
