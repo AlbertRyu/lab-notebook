@@ -2312,14 +2312,71 @@
       // PAGE 3 — NOTES
       // ═══════════════════════════════════════════════════════════════════════════
 
-      const notes = { list: [], current: null, dirty: false, samples: [] };
+      const notes = {
+        list: [],
+        current: null,
+        dirty: false,
+        mentionTargets: [],
+        experimentToSample: {},
+      };
       let _notesLoaded = false;
       let _noteSaveTimer = null;
 
+      const EXP_TYPE_LABEL = {
+        "ppms-vsm": "PPMS-VSM",
+        "ppms-hc": "PPMS-HC",
+        pxrd: "PXRD",
+        sxrd: "SXRD",
+        microscopy: "Microscopy",
+      };
+
       async function notesInit() {
         _notesLoaded = true;
-        notes.samples = await api("/api/samples").catch(() => []);
+        await notesBuildMentionTargets();
         await notesLoadList();
+      }
+
+      async function notesBuildMentionTargets() {
+        const samples = await api("/api/samples").catch(() => []);
+        const allNotes = await api("/api/notes").catch(() => []);
+
+        const sampleTargets = samples.map((s) => ({
+          kind: "sample",
+          id: s.id,
+          label: s.name,
+          hint: s.compound || "",
+          search: `${s.name} ${s.compound || ""}`.toLowerCase(),
+        }));
+
+        const expTargets = [];
+        notes.experimentToSample = {};
+        const details = await Promise.all(
+          samples.map((s) => api(`/api/samples/${s.id}`).catch(() => null)),
+        );
+        details.forEach((detail) => {
+          if (!detail || !detail.experiments) return;
+          detail.experiments.forEach((exp) => {
+            notes.experimentToSample[exp.id] = detail.id;
+            const expLabel = `${detail.name} / ${EXP_TYPE_LABEL[exp.type] || exp.type.toUpperCase()}${exp.exp_date ? ` (${exp.exp_date})` : ""}`;
+            expTargets.push({
+              kind: "experiment",
+              id: exp.id,
+              label: expLabel,
+              hint: "measurement",
+              search: `${detail.name} ${exp.type} ${exp.exp_date || ""}`.toLowerCase(),
+            });
+          });
+        });
+
+        const noteTargets = allNotes.map((n) => ({
+          kind: "note",
+          id: n.id,
+          label: n.title || `Untitled #${n.id}`,
+          hint: "note",
+          search: `${n.title || ""} ${n.body || ""}`.toLowerCase(),
+        }));
+
+        notes.mentionTargets = [...sampleTargets, ...expTargets, ...noteTargets];
       }
 
       async function notesLoadList(q = "") {
@@ -2420,6 +2477,7 @@
         notes.dirty = false;
         notesRenderList();
         notesRenderEditor();
+        await notesBuildMentionTargets();
         setTimeout(
           () => document.getElementById("note-title-input").focus(),
           50,
@@ -2462,6 +2520,7 @@
           if (idx >= 0) notes.list[idx] = updated;
           else notes.list.unshift(updated);
           notesRenderList();
+          await notesBuildMentionTargets();
         } catch (e) {
           document.getElementById("note-save-status").textContent =
             "Save failed";
@@ -2480,6 +2539,7 @@
         document.getElementById("notes-placeholder").style.display = "flex";
         document.getElementById("notes-editor-wrap").style.display = "none";
         notesRenderList();
+        await notesBuildMentionTargets();
       }
 
       function notesApplySearch() {
@@ -2512,17 +2572,21 @@
         if (!text)
           return '<p style="color:var(--fg-muted)">Nothing written yet.</p>';
 
-        // 1. Extract @[label](sample:id) mentions before Markdown parsing
+        // 1. Extract @[label](kind:id) mentions before Markdown parsing
         //    so marked.js doesn't mangle the custom syntax.
         const chips = [];
         const ph = (i) => `\x00CHIP${i}\x00`;
         let safe = text.replace(
-          /@\[([^\]]+)\]\(sample:(\d+)\)/g,
-          (_, label, id) => {
+          /@\[([^\]]+)\]\((sample|experiment|note):(\d+)\)/g,
+          (_, label, kind, id) => {
             const i = chips.length;
-            chips.push(
-              `<span class="mention-chip" onclick="invJumpTo(${id})">@${esc(label)}</span>`,
-            );
+            const click =
+              kind === "sample"
+                ? `mentionJumpSample(${id})`
+                : kind === "experiment"
+                  ? `mentionJumpExperiment(${id})`
+                  : `mentionJumpNote(${id})`;
+            chips.push(`<span class="mention-chip" onclick="${click}">@${esc(label)}</span>`);
             return ph(i);
           },
         );
@@ -2539,27 +2603,60 @@
       }
 
       // Jump to sample from note @mention
-      function invJumpTo(sampleId) {
+      function mentionJumpSample(sampleId) {
         showPage("inventory");
         invSelectSample(sampleId);
       }
 
+      async function mentionJumpExperiment(expId) {
+        const sampleId = notes.experimentToSample[expId];
+        if (!sampleId) return;
+        showPage("inventory");
+        await invSelectSample(sampleId);
+        const el = document.getElementById(`meas-${expId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.style.outline = "2px solid var(--accent)";
+          setTimeout(() => {
+            el.style.outline = "";
+          }, 1200);
+        }
+      }
+
+      async function mentionJumpNote(noteId) {
+        showPage("notes");
+        if (!_notesLoaded) await notesInit();
+        await notesSelect(noteId);
+      }
+
       // ─ @mention autocomplete ─
       let _mentionStart = -1;
+
+      function parseMentionQuery(raw) {
+        const trimmedLeft = raw.replace(/^\s+/, "");
+        const m = trimmedLeft.match(/^([smnSMN])\s+(.*)$/);
+        if (!m) {
+          return { kind: null, query: raw.trim().toLowerCase() };
+        }
+        const key = m[1].toLowerCase();
+        const kind = key === "s" ? "sample" : key === "m" ? "experiment" : "note";
+        return { kind, query: (m[2] || "").trim().toLowerCase() };
+      }
 
       function noteHandleMention(e) {
         const ta = document.getElementById("note-body");
         const pos = ta.selectionStart;
         const text = ta.value;
 
-        // Find the @ that started this mention word
+        // Find the nearest @ in the current line.
+        // Spaces are allowed so prefix filters like "@s " keep working.
         let atPos = -1;
         for (let i = pos - 1; i >= 0; i--) {
           if (text[i] === "@") {
             atPos = i;
             break;
           }
-          if (text[i] === " " || text[i] === "\n") break;
+          if (text[i] === "\n") break;
         }
 
         if (atPos === -1) {
@@ -2568,9 +2665,10 @@
         }
 
         _mentionStart = atPos;
-        const query = text.slice(atPos + 1, pos).toLowerCase();
-        const matches = notes.samples
-          .filter((s) => s.name.toLowerCase().includes(query))
+        const raw = text.slice(atPos + 1, pos);
+        const { kind, query } = parseMentionQuery(raw);
+        const matches = notes.mentionTargets
+          .filter((t) => (!kind || t.kind === kind) && t.search.includes(query))
           .slice(0, 8);
 
         if (!matches.length) {
@@ -2586,11 +2684,11 @@
         dd.style.top = coords.y + "px";
         dd.innerHTML = matches
           .map(
-            (s, i) => `
-    <div class="mention-option${i === 0 ? " focused" : ""}" data-id="${s.id}" data-name="${esc(s.name)}"
-         onclick="mentionInsert(${s.id}, '${esc(s.name)}')">
-      <span>@${esc(s.name)}</span>
-      <span class="mo-type">${esc(s.compound || "")}</span>
+            (t, i) => `
+    <div class="mention-option${i === 0 ? " focused" : ""}" data-kind="${t.kind}" data-id="${t.id}" data-label="${esc(t.label)}"
+         onclick="mentionInsertFromEl(this)">
+      <span>@${esc(t.label)}</span>
+      <span class="mo-type">${esc(t.hint)}</span>
     </div>`,
           )
           .join("");
@@ -2614,20 +2712,28 @@
           const focused = dd.querySelector(".focused");
           if (focused) {
             e.preventDefault();
-            mentionInsert(parseInt(focused.dataset.id), focused.dataset.name);
+            mentionInsert(
+              focused.dataset.kind,
+              parseInt(focused.dataset.id),
+              focused.dataset.label,
+            );
           }
         } else if (e.key === "Escape") {
           mentionHide();
         }
       }
 
-      function mentionInsert(id, name) {
+      function mentionInsertFromEl(el) {
+        mentionInsert(el.dataset.kind, parseInt(el.dataset.id), el.dataset.label);
+      }
+
+      function mentionInsert(kind, id, label) {
         const ta = document.getElementById("note-body");
         const pos = ta.selectionStart;
         const text = ta.value;
         const before = text.slice(0, _mentionStart);
         const after = text.slice(pos);
-        const insert = `@[${name}](sample:${id})`;
+        const insert = `@[${label}](${kind}:${id})`;
         ta.value = before + insert + after;
         const newPos = before.length + insert.length;
         ta.setSelectionRange(newPos, newPos);
