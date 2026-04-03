@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import (
     Depends,
     FastAPI,
+    Form,
     HTTPException,
     Request,
     Response,
@@ -48,6 +49,18 @@ app = FastAPI(title="Lab Notebook")
 
 DATA_DIR_PATH = Path(os.environ.get("DATA_DIR", "/data"))
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+
+
+def _get_scan_roots() -> list[Path]:
+    """Return configured scan root directories.
+
+    Defaults to DATA_DIR/samples. Override with SCAN_ROOTS env var
+    (colon-separated absolute paths, e.g. /data/samples:/data/external/ppms).
+    """
+    env = os.environ.get("SCAN_ROOTS", "").strip()
+    if env:
+        return [Path(p.strip()) for p in env.split(":") if p.strip()]
+    return [DATA_DIR_PATH / "samples"]
 
 AUTH_COOKIE_NAME = "lab_notebook_auth"
 AUTH_TTL_SECONDS = int(os.environ.get("AUTH_TTL_SECONDS", "28800"))  # 8 hours
@@ -186,7 +199,7 @@ def _seed_if_empty():
     from database import engine
 
     with Session(engine) as session:
-        scanner.scan(session)
+        scanner.scan(session, _get_scan_roots())
 
 
 # ── Static files ───────────────────────────────────────────────────────────
@@ -582,7 +595,37 @@ def trigger_scan(
     _: None = Depends(require_write_auth),
     session: Session = Depends(get_session),
 ):
-    result = scanner.scan(session)
+    result = scanner.scan(session, _get_scan_roots())
+    return result
+
+
+@app.post("/api/scan/folder")
+async def scan_uploaded_folder(
+    files: list[UploadFile] = FastAPIFile(...),
+    paths: list[str] = Form(...),
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
+    """Accept an uploaded folder (files + their relative paths), save to DATA_DIR,
+    then run the scanner on the saved directory."""
+    if not files or len(files) != len(paths):
+        raise HTTPException(400, "files and paths must be non-empty and equal in length")
+
+    # Validate no path traversal
+    for p in paths:
+        if ".." in p.split("/"):
+            raise HTTPException(400, f"Invalid path: {p}")
+
+    # Root folder name is the first component of the first relative path
+    root_name = paths[0].split("/")[0]
+    target_dir = DATA_DIR_PATH / "samples" / root_name
+
+    for file, rel_path in zip(files, paths):
+        dest = DATA_DIR_PATH / "samples" / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(await file.read())
+
+    result = scanner.scan(session, [target_dir])
     return result
 
 

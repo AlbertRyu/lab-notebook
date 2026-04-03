@@ -102,6 +102,60 @@ def detect_mode(df: dict) -> str:
     return "MH" if score_H > score_T else "MT"
 
 
+def extract_header_meta(path: str) -> dict:
+    """Extract sample/measurement metadata from a PPMS .dat file header.
+
+    Returns a dict with any of these keys (all optional):
+      sample  – sample name (from SAMPLE_MATERIAL)
+      type    – 'ppms-vsm' or 'ppms-hc' (from BYAPP)
+      date    – datetime.date (from FILEOPENTIME)
+      notes   – free-text notes (from SAMPLE_COMMENT / SAMPLE_MASS)
+    """
+    meta: dict = {}
+    try:
+        raw = Path(path).read_bytes()
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("iso-8859-1")
+    except OSError:
+        return meta
+
+    from datetime import datetime as _DT
+
+    for line in text.splitlines():
+        s = line.strip()
+        if s == "[Data]":
+            break
+        if s.startswith("BYAPP,"):
+            parts = s.split(",")
+            app = parts[1].strip().upper() if len(parts) > 1 else ""
+            if app == "VSM":
+                meta["type"] = "ppms-vsm"
+            elif app == "HC":
+                meta["type"] = "ppms-hc"
+        elif s.startswith("INFO,"):
+            parts = s.split(",", 2)
+            if len(parts) == 3:
+                value, key = parts[1].strip(), parts[2].strip()
+                if key == "SAMPLE_MATERIAL" and value:
+                    meta["sample"] = value
+                elif key == "SAMPLE_COMMENT" and value:
+                    meta.setdefault("notes", value)
+                elif key == "SAMPLE_MASS" and value:
+                    note = f"Mass: {value} mg"
+                    meta["notes"] = (meta["notes"] + "\n" + note).strip() if "notes" in meta else note
+        elif s.startswith("FILEOPENTIME,"):
+            parts = s.split(",")
+            if len(parts) >= 3:
+                try:
+                    meta["date"] = _DT.strptime(parts[2].strip(), "%m/%d/%Y").date()
+                except ValueError:
+                    pass
+
+    return meta
+
+
 def to_traces(df: dict, mode: str, label: str) -> list[dict]:
     T = df.get("Temperature (K)", [])
     H = df.get("Magnetic Field (Oe)", [])

@@ -1325,8 +1325,22 @@
                 id="inv-scan-btn"
                 onclick="triggerScan()"
               >
-                Scan Folder
+                Scan
               </button>
+              <button
+                class="auth-write"
+                id="inv-import-btn"
+                onclick="importFolder()"
+              >
+                Import Folder
+              </button>
+              <input
+                type="file"
+                id="inv-folder-input"
+                webkitdirectory
+                multiple
+                style="display:none"
+              />
             </div>
             <div
               id="inv-detail-placeholder"
@@ -1376,6 +1390,13 @@
                         onclick="openEditSample()"
                       >
                         Edit
+                      </button>
+                      <button
+                        class="auth-write danger"
+                        id="detail-delete-sample-btn"
+                        onclick="deleteSample()"
+                      >
+                        Delete
                       </button>
                     </div>
                   </div>
@@ -1720,8 +1741,10 @@
         [
           "inv-add-sample-btn",
           "inv-scan-btn",
+          "inv-import-btn",
           "detail-add-exp-btn",
           "detail-edit-sample-btn",
+          "detail-delete-sample-btn",
           "notes-add-btn",
           "note-save-btn",
           "note-pin-btn",
@@ -2195,6 +2218,35 @@
         }
       }
 
+      async function importFolder() {
+        if (!ensureWriteAuth()) return;
+        const input = document.getElementById("inv-folder-input");
+        input.onchange = async () => {
+          const files = Array.from(input.files);
+          input.value = "";
+          if (!files.length) return;
+
+          const st = document.getElementById("inv-scan-status");
+          st.textContent = `Uploading ${files.length} files…`;
+
+          const formData = new FormData();
+          for (const f of files) {
+            formData.append("files", f);
+            formData.append("paths", f.webkitRelativePath);
+          }
+          try {
+            const r = await api("/api/scan/folder", { method: "POST", body: formData });
+            st.textContent = `+${r.samples}s +${r.experiments}e +${r.files}f`;
+            await invLoadFilters();
+            await invLoadSamples();
+            if (inv.current) await invSelectSample(inv.current.id);
+          } catch (e) {
+            st.textContent = "Error";
+          }
+        };
+        input.click();
+      }
+
       // ─ Add sample modal ─
       function openAddSample() {
         if (!ensureWriteAuth()) return;
@@ -2231,6 +2283,16 @@
             await invLoadSamples();
           },
         );
+      }
+
+      async function deleteSample() {
+        if (!ensureWriteAuth()) return;
+        if (!inv.current) return;
+        if (!confirm(`Delete sample "${inv.current.name}"? This cannot be undone.`)) return;
+        await api(`/api/samples/${inv.current.id}`, { method: "DELETE" });
+        inv.current = null;
+        await invLoadFilters();
+        await invLoadSamples();
       }
 
       function openEditSample() {

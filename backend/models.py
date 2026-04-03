@@ -20,9 +20,10 @@ class Sample(SQLModel, table=True):
 class Experiment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     sample_id: int = Field(foreign_key="sample.id")
-    type: str  # microscopy | pxrd | sxrd | ppms-vsm | ppms-hc
+    type: str  # microscopy | pxrd | sxrd | ppms-vsm | ppms-hc | fmr
     exp_date: Optional[Date] = Field(default=None)
     notes: Optional[str] = Field(default=None)
+    source_path: Optional[str] = Field(default=None, index=True)  # folder path, used for dedup on scan
 
     sample: Optional[Sample] = Relationship(back_populates="experiments")
     files: List["DataFile"] = Relationship(back_populates="experiment")

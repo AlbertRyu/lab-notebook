@@ -12,6 +12,7 @@ def create_db():
 
     SQLModel.metadata.create_all(engine)
     _migrate_note_pinned_column()
+    _migrate_experiment_source_path()
 
 
 def _migrate_note_pinned_column():
@@ -23,6 +24,16 @@ def _migrate_note_pinned_column():
             conn.execute(
                 text("ALTER TABLE note ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT 0")
             )
+            conn.commit()
+
+
+def _migrate_experiment_source_path():
+    """Add experiment.source_path for databases created before this field existed."""
+    with engine.connect() as conn:
+        cols = conn.execute(text("PRAGMA table_info(experiment)")).fetchall()
+        col_names = {row[1] for row in cols}
+        if "source_path" not in col_names:
+            conn.execute(text("ALTER TABLE experiment ADD COLUMN source_path TEXT"))
             conn.commit()
 
 
