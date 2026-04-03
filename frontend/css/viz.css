@@ -1,0 +1,86 @@
+/* ══ PAGE 2 — VISUALIZATION ══ */
+
+#page-viz { flex-direction: row; }
+
+#viz-left {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+}
+#viz-toolbar {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#viz-toolbar select { flex: 1; min-width: 80px; font-size: 11.5px; }
+#viz-table-wrap { flex: 1; overflow-y: auto; }
+
+#viz-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+#viz-table col.c-sel  { width: 30px; }
+#viz-table col.c-mode { width: 96px; }
+#viz-table th {
+  background: var(--bg-header);
+  padding: 5px 7px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  border-bottom: 1px solid var(--border-strong);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+#viz-table td { padding: 4px 7px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+#viz-table tr:hover td { background: var(--row-hover); }
+#viz-table tr.selected td { background: var(--row-selected); }
+#viz-table .fname { font-family: monospace; font-size: 11px; }
+#viz-table .fsample { font-size: 10.5px; color: var(--fg-muted); display: block; }
+
+#viz-status {
+  padding: 5px 10px;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-header);
+  flex-shrink: 0;
+  min-height: 28px;
+}
+#viz-status::before {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  flex-shrink: 0;
+}
+#viz-status.ready::before { background: #22c55e; }
+#viz-status.busy::before  { background: #f59e0b; }
+#viz-status.error::before { background: #ef4444; }
+
+.mode-group { display: flex; gap: 6px; align-items: center; }
+.mode-group label { display: flex; align-items: center; gap: 2px; font-size: 11px; cursor: pointer; color: var(--fg-dim); }
+.mode-group label:has(input:checked) { color: var(--accent); font-weight: 600; }
+.mode-group input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; }
+
+#viz-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#viz-plot-toolbar {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-header);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+#viz-plot { flex: 1; }

@@ -1,0 +1,50 @@
+<div class="page" id="page-notes">
+  <!-- Left: notes list -->
+  <div id="notes-left">
+    <div style="padding:7px 10px;border-bottom:1px solid var(--border);display:flex;gap:6px;">
+      <span style="font-weight:700;font-size:13px;flex:1">Notes</span>
+      <button class="primary auth-write" id="notes-add-btn" onclick="createNewNote()">+ Note</button>
+    </div>
+    <div id="notes-search">
+      <input id="notes-search-input" type="search" placeholder="Search notes…" oninput="notesApplySearch()" />
+    </div>
+    <div id="notes-list"></div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" data-target="notes-left"></div>
+
+  <!-- Right: editor -->
+  <div id="notes-right">
+    <div id="notes-placeholder" class="placeholder" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="icon">📝</div>
+      <div>Select a note or create a new one</div>
+      <div style="font-size:11px;color:var(--fg-muted);margin-top:8px;">Use @ to mention samples, measurements, or notes</div>
+    </div>
+
+    <div id="notes-editor-wrap" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div id="note-tabs">
+        <div class="note-tab auth-write active" id="note-tab-edit"    onclick="noteSetTab('edit')">Edit</div>
+        <div class="note-tab"                  id="note-tab-preview"  onclick="noteSetTab('preview')">Preview</div>
+        <div style="flex:1"></div>
+        <button class="auth-write" id="note-pin-btn"    style="margin:4px 0;padding:3px 8px;"   onclick="noteTogglePin()">Pin</button>
+        <button class="danger auth-write" id="note-delete-btn" style="margin:4px 8px;padding:3px 8px;" onclick="deleteCurrentNote()">Delete</button>
+      </div>
+      <div id="note-editor">
+        <input id="note-title-input" type="text" placeholder="Note title…" oninput="noteMarkDirty()" />
+        <div id="note-body-wrap">
+          <textarea id="note-body"
+            placeholder="Start writing… use @ to mention a sample or experiment."
+            oninput="noteMarkDirty(); noteHandleMention(event);"
+            onkeydown="noteHandleMentionKey(event)"
+          ></textarea>
+          <div id="note-render"></div>
+        </div>
+        <div id="note-footer">
+          <button class="primary auth-write" id="note-save-btn" onclick="noteSave()">Save</button>
+          <span id="note-save-status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

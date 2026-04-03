@@ -1,0 +1,59 @@
+<div class="page" id="page-inventory">
+  <!-- Left: sample list -->
+  <div id="inv-left">
+    <div id="inv-search">
+      <input id="inv-search-input" type="search" placeholder="Search samples…" oninput="invApplyFilters()" />
+    </div>
+    <div id="inv-filters">
+      <select id="inv-compound" onchange="invApplyFilters()"><option value="">All compounds</option></select>
+      <select id="inv-batch"    onchange="invApplyFilters()"><option value="">All batches</option></select>
+      <select id="inv-box"      onchange="invApplyFilters()"><option value="">All boxes</option></select>
+    </div>
+    <div id="inv-list"></div>
+    <div id="inv-footer">
+      <span id="inv-count">0 samples</span>
+      <span id="inv-scan-status"></span>
+    </div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" data-target="inv-left"></div>
+
+  <!-- Right: detail -->
+  <div id="inv-right">
+    <div id="inv-header-toolbar" style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg-header);border-bottom:1px solid var(--border-strong);flex-shrink:0;">
+      <span style="font-weight:700;font-size:13px">Sample Inventory</span>
+      <div style="flex:1"></div>
+      <button class="primary auth-write" id="inv-add-sample-btn" onclick="openAddSample()">+ Sample</button>
+      <button class="auth-write" id="inv-scan-btn" onclick="triggerScan()">Scan</button>
+      <button class="auth-write" id="inv-import-btn" onclick="importFolder()">Import Folder</button>
+      <input type="file" id="inv-folder-input" webkitdirectory multiple style="display:none" />
+    </div>
+
+    <div id="inv-detail-placeholder" class="placeholder" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="icon">🔬</div>
+      <div>Select a sample to view details</div>
+    </div>
+
+    <div id="inv-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div id="inv-detail-scroll" style="flex:1;overflow-y:auto;">
+        <div id="detail-header">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            <h2 id="detail-name"></h2>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="auth-write" id="detail-add-exp-btn"    onclick="openAddExperiment()">+ Experiment</button>
+              <button class="auth-write" id="detail-edit-sample-btn" onclick="openEditSample()">Edit</button>
+              <button class="auth-write danger" id="detail-delete-sample-btn" onclick="deleteSample()">Delete</button>
+            </div>
+          </div>
+          <div class="meta-grid" id="detail-meta"></div>
+          <div id="detail-notes" style="font-size:12px;color:var(--fg-dim);margin-top:6px;font-style:italic;"></div>
+          <!-- Sample-level photos -->
+          <div id="sample-photos" style="margin-top:10px;"></div>
+        </div>
+        <!-- Measurements section -->
+        <div id="inv-measurements" style="padding:12px 18px 18px;"></div>
+      </div>
+    </div>
+  </div>
+</div>

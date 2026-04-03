@@ -1,0 +1,104 @@
+<div class="page active" id="page-overview">
+  <div id="ov-cover"></div>
+  <div id="ov-content">
+    <div id="ov-title-row">
+      <span id="ov-icon">🔬</span>
+      <input id="ov-title" type="text" value="HOIP Project" placeholder="Project title…" oninput="ovSave()" />
+    </div>
+    <textarea id="ov-description" rows="2" placeholder="Add a description… What is this project about?" oninput="ovSave()"></textarea>
+
+    <!-- Properties -->
+    <div class="ov-section-title">⚙️ Properties</div>
+    <div id="ov-props">
+      <div class="ov-prop-key">👤 Principal Investigator</div>
+      <div class="ov-prop-val"><input id="ov-prop-pi" class="ov-editable" placeholder="Name…" oninput="ovSave()"></div>
+      <div class="ov-prop-key">🏛️ Affiliation</div>
+      <div class="ov-prop-val"><input id="ov-prop-affil" class="ov-editable" placeholder="Institution…" oninput="ovSave()"></div>
+      <div class="ov-prop-key">🗓️ Start Date</div>
+      <div class="ov-prop-val"><input id="ov-prop-start" class="ov-editable" type="date" oninput="ovSave()"></div>
+      <div class="ov-prop-key">🧪 Material Family</div>
+      <div class="ov-prop-val"><input id="ov-prop-compound" class="ov-editable" placeholder="e.g. Hybrid Perovskites…" oninput="ovSave()"></div>
+      <div class="ov-prop-key">📌 Status</div>
+      <div class="ov-prop-val">
+        <select id="ov-prop-status" class="ov-editable" style="padding:0" onchange="ovUpdateStatus(); ovSave()">
+          <option value="active">🟢 Active</option>
+          <option value="paused">🟡 Paused</option>
+          <option value="completed">✅ Completed</option>
+          <option value="planning">🔵 Planning</option>
+        </select>
+      </div>
+      <div class="ov-prop-key">📋 Notes</div>
+      <div class="ov-prop-val"><input id="ov-prop-notes" class="ov-editable" placeholder="Any quick notes…" oninput="ovSave()"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="ov-section-title">📊 At a Glance</div>
+    <div id="ov-stats">
+      <div class="ov-stat-card">
+        <div class="ov-stat-num" id="ov-stat-samples">—</div>
+        <div class="ov-stat-label">Samples</div>
+      </div>
+      <div class="ov-stat-card">
+        <div class="ov-stat-num" id="ov-stat-exps">—</div>
+        <div class="ov-stat-label">Experiments</div>
+      </div>
+      <div class="ov-stat-card">
+        <div class="ov-stat-num" id="ov-stat-compounds">—</div>
+        <div class="ov-stat-label">Compounds</div>
+      </div>
+      <div class="ov-stat-card">
+        <div class="ov-stat-num" id="ov-stat-files">—</div>
+        <div class="ov-stat-label">Data Files</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="ov-section-title">📈 Data Summary</div>
+    <div id="ov-charts">
+      <div class="ov-chart-card">
+        <div class="ov-chart-title">Experiments by Type</div>
+        <div class="ov-chart-body" id="ov-chart-exps"></div>
+      </div>
+      <div class="ov-chart-card">
+        <div class="ov-chart-title">Samples by Compound</div>
+        <div class="ov-chart-body" id="ov-chart-compounds"></div>
+      </div>
+    </div>
+
+    <!-- Sample database view -->
+    <div class="ov-section-title">🗃️ Sample Database</div>
+    <div class="ov-table-wrap">
+      <table class="ov-db-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Compound</th>
+            <th>Batch</th>
+            <th>Box</th>
+            <th>Synthesis Date</th>
+          </tr>
+        </thead>
+        <tbody id="ov-sample-tbody">
+          <tr><td colspan="5" style="padding:20px;text-align:center;color:var(--fg-muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Goals / Milestones -->
+    <div class="ov-section-title">🎯 Goals &amp; Milestones</div>
+    <div class="ov-table-wrap">
+      <table id="ov-goals-table">
+        <thead>
+          <tr>
+            <th>Milestone</th>
+            <th style="width:130px">Status</th>
+            <th style="width:120px">Deadline</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="ov-goals-tbody"></tbody>
+      </table>
+    </div>
+    <button id="ov-add-goal" class="auth-write" onclick="ovAddGoal()">+ Add milestone</button>
+  </div>
+</div>

@@ -1,0 +1,26 @@
+<div class="page" id="page-graph">
+  <div id="graph-left">
+    <div id="graph-panel-head">
+      <span style="font-weight:700;font-size:13px">Entity Graph</span>
+    </div>
+    <div id="graph-panel-body">
+      <div>Shows relationships across:</div>
+      <div class="graph-legend-item"><span class="graph-dot sample"></span><span>Samples</span></div>
+      <div class="graph-legend-item"><span class="graph-dot experiment"></span><span>Measurements</span></div>
+      <div class="graph-legend-item"><span class="graph-dot note"></span><span>Notes</span></div>
+      <div style="margin-top:8px;font-size:11px;color:var(--fg-muted);">
+        Edge types: ownership (sample→measurement), references from note mentions.
+      </div>
+    </div>
+    <div id="graph-status">Open graph to load…</div>
+  </div>
+  <div class="resizer" data-target="graph-left"></div>
+  <div id="graph-right">
+    <div id="graph-toolbar">
+      <span style="font-weight:700;font-size:13px">Knowledge Graph</span>
+      <div style="flex:1"></div>
+      <button onclick="graphRefresh()">Refresh</button>
+    </div>
+    <div id="graph-canvas"></div>
+  </div>
+</div>

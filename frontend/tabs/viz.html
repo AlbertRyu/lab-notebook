@@ -1,0 +1,48 @@
+<div class="page" id="page-viz">
+  <!-- Left: file picker -->
+  <div id="viz-left">
+    <div id="viz-toolbar">
+      <select id="viz-exp-type" onchange="vizLoadFiles()">
+        <option value="ppms-vsm">PPMS-VSM</option>
+        <option value="ppms-hc">PPMS-HC</option>
+        <option value="pxrd">PXRD</option>
+        <option value="sxrd">SXRD</option>
+      </select>
+      <select id="viz-sample-filter" onchange="vizLoadFiles()">
+        <option value="">All samples</option>
+      </select>
+    </div>
+    <div id="viz-table-wrap">
+      <table id="viz-table">
+        <colgroup>
+          <col />
+          <col class="c-mode" />
+          <col class="c-sel" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Mode</th>
+            <th><input type="checkbox" id="viz-select-all" title="Select all" /></th>
+          </tr>
+        </thead>
+        <tbody id="viz-tbody"></tbody>
+      </table>
+    </div>
+    <div id="viz-status">Open a data type to begin.</div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" data-target="viz-left"></div>
+
+  <!-- Right: plot -->
+  <div id="viz-right">
+    <div id="viz-plot-toolbar">
+      <span style="font-weight:700;font-size:13px">Data Visualization</span>
+      <div style="flex:1"></div>
+      <button class="primary" id="viz-plot-btn" disabled onclick="vizRenderPlot()">Plot Selected</button>
+      <button onclick="vizClearPlot()">Clear</button>
+    </div>
+    <div id="viz-plot"></div>
+  </div>
+</div>
