@@ -2348,7 +2348,9 @@
           viz.selected.clear();
           viz.fileModes = {};
           viz.files.forEach((f) => {
-            viz.fileModes[f.id] = type.startsWith("ppms") ? "MH" : "";
+            viz.fileModes[f.id] = type.startsWith("ppms")
+              ? f.auto_mode || "MT"
+              : "";
           });
           vizRenderTable();
           vizSetStatus(

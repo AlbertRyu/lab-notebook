@@ -628,19 +628,35 @@ def list_files(
         stmt = stmt.where(Sample.id == sample_id)
 
     rows = session.exec(stmt).all()
-    return [
-        FileWithContext(
-            id=f.id,
-            filename=f.filename,
-            path=f.path,
-            file_type=f.file_type,
-            experiment_id=exp.id,
-            exp_type=exp.type,
-            sample_id=s.id,
-            sample_name=s.name,
+    out: list[FileWithContext] = []
+
+    for f, exp, s in rows:
+        auto_mode = None
+        if exp.type in {"ppms-vsm", "ppms-hc"}:
+            try:
+                from parsers.ppms import parse_dat, detect_mode
+
+                abs_path = str(DATA_DIR_PATH / f.path)
+                df = parse_dat(abs_path)
+                auto_mode = detect_mode(df) if df else None
+            except Exception:
+                auto_mode = None
+
+        out.append(
+            FileWithContext(
+                id=f.id,
+                filename=f.filename,
+                path=f.path,
+                file_type=f.file_type,
+                experiment_id=exp.id,
+                exp_type=exp.type,
+                sample_id=s.id,
+                sample_name=s.name,
+                auto_mode=auto_mode,
+            )
         )
-        for f, exp, s in rows
-    ]
+
+    return out
 
 
 # ── Multi-file visualization (for Visualization page) ─────────────────────

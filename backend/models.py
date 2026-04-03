@@ -152,3 +152,4 @@ class FileWithContext(SQLModel):
     exp_type: str
     sample_id: int
     sample_name: str
+    auto_mode: Optional[str] = None
