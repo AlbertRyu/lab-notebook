@@ -14,9 +14,9 @@ services:
       - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-false}
       - AUTH_TTL_SECONDS=${AUTH_TTL_SECONDS:-28800}
     restart: unless-stopped
-#    networks:
-#      - homelab
+    networks:
+      - homelab
 
-#networks:
-#  homelab:
-#    external: true
+networks:
+  homelab:
+    external: true
