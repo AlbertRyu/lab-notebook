@@ -16,8 +16,7 @@ const OV_TYPE_COLORS = {
 
 function ovSave() {
   const data = {};
-  ["ov-title","ov-description","ov-prop-pi","ov-prop-affil",
-   "ov-prop-start","ov-prop-compound","ov-prop-status","ov-prop-notes"].forEach((id) => {
+  ["ov-title","ov-description"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) data[id] = el.value;
   });
@@ -27,14 +26,11 @@ function ovSave() {
 function ovLoadEditable() {
   let data = {};
   try { data = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
-  ["ov-title","ov-description","ov-prop-pi","ov-prop-affil",
-   "ov-prop-start","ov-prop-compound","ov-prop-status","ov-prop-notes"].forEach((id) => {
+  ["ov-title","ov-description"].forEach((id) => {
     const el = document.getElementById(id);
     if (el && data[id] !== undefined) el.value = data[id];
   });
 }
-
-function ovUpdateStatus() { /* native <select> renders fine */ }
 
 // ── Goals / Milestones ───────────────────────────────────────────────────
 
@@ -201,5 +197,288 @@ function ovShow() {
   let data = {};
   try { data = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
   ovRenderGoals(data["ov-goals"] || ovGoalsBuild());
+  _ovPpmsCompounds = null;  // force fresh fetch from server on each tab activation
+  ovPpmsRender();
   ovLoadLive();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PPMS Representative Graphs — interactive compound cards
+// Data is persisted on the server at /data/ppms_config.json
+// ═══════════════════════════════════════════════════════════════════════════
+
+// In-memory cache; reset to null each time the overview tab is opened so
+// the latest server data is always fetched on activation.
+let _ovPpmsCompounds = null;
+
+// All images available in /static/images/ppms/
+const OV_PPMS_IMAGES = [
+  { file: "MnPEA_MT.png",               label: "Mn-PEA  M vs T" },
+  { file: "MnPEA_MH.png",               label: "Mn-PEA  M vs H" },
+  { file: "MnPEA_HC.png",               label: "Mn-PEA  HC" },
+  { file: "MnPEA_HC_Zoomed.png",        label: "Mn-PEA  HC Zoomed" },
+  { file: "MnPEA_PhaseDiagram.png",     label: "Mn-PEA  Phase Diagram" },
+  { file: "MnPEA_PhaseDiagram_Zoom.png",label: "Mn-PEA  Phase Diagram Zoom" },
+  { file: "4Cl_MT.png",  label: "4Cl-Mn-BA  M vs T" },
+  { file: "4Cl_MH.png",  label: "4Cl-Mn-BA  M vs H" },
+  { file: "4Cl_HC.png",  label: "4Cl-Mn-BA  HC" },
+  { file: "4H_MT.png",   label: "4H-Mn-BA  M vs T" },
+  { file: "4H_MH.png",   label: "4H-Mn-BA  M vs H" },
+  { file: "4H_HC.png",   label: "4H-Mn-BA  HC" },
+  { file: "4F_MT.png",   label: "4F-Mn-BA  M vs T" },
+  { file: "4F_MH.png",   label: "4F-Mn-BA  M vs H" },
+  { file: "4Br_MT.png",  label: "4Br-Mn-BA  M vs T" },
+  { file: "4Br_MH.png",  label: "4Br-Mn-BA  M vs H" },
+  { file: "4Br_HC.png",  label: "4Br-Mn-BA  HC" },
+];
+
+const OV_PPMS_CATS = [
+  { key: "vsm",          label: "VSM" },
+  { key: "hc",           label: "Heat Capacity" },
+  { key: "phase_diagram",label: "Phase Diagram" },
+];
+
+const OV_PPMS_DEFAULT = [
+  { id: "mn-pea",    name: "Mn-PEA",    description: "Data from Lukas's old sample (DSC4 & DSC6).",
+    vsm: ["MnPEA_MT.png","MnPEA_MH.png"],
+    hc:  ["MnPEA_HC.png","MnPEA_HC_Zoomed.png"],
+    phase_diagram: ["MnPEA_PhaseDiagram.png","MnPEA_PhaseDiagram_Zoom.png"] },
+  { id: "4cl-mn-ba", name: "4Cl-Mn-BA", description: "Representative: 4Cl-Mn-BA - 1",
+    vsm: ["4Cl_MT.png","4Cl_MH.png"], hc: ["4Cl_HC.png"], phase_diagram: [] },
+  { id: "4h-mn-ba",  name: "4H-Mn-BA",  description: "Representative: 4H-Mn-BA - 1",
+    vsm: ["4H_MT.png","4H_MH.png"],   hc: ["4H_HC.png"],  phase_diagram: [] },
+  { id: "4f-mn-ba",  name: "4F-Mn-BA",  description: "Representative: 4F-Mn-BA - 1",
+    vsm: ["4F_MT.png","4F_MH.png"],   hc: [],             phase_diagram: [] },
+  { id: "4br-mn-ba", name: "4Br-Mn-BA", description: "Representative: 4Br-Mn-BA - 1",
+    vsm: ["4Br_MT.png","4Br_MH.png"], hc: ["4Br_HC.png"], phase_diagram: [] },
+  { id: "4i-mn-ba",  name: "4I-Mn-BA",  description: "Representative: 4I-Mn-BA - 1",
+    vsm: [], hc: [], phase_diagram: [] },
+];
+
+async function ovPpmsLoadFromServer() {
+  try {
+    const res = await fetch("/api/ppms-config");
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) return data;
+  } catch (_) {}
+  // Fall back to built-in defaults (first run or server error)
+  return OV_PPMS_DEFAULT.map(c => ({ ...c,
+    vsm: [...c.vsm], hc: [...c.hc], phase_diagram: [...c.phase_diagram] }));
+}
+
+async function ovPpmsSaveToServer() {
+  try {
+    const res = await fetch("/api/ppms-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_ovPpmsCompounds),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  } catch (e) {
+    console.error("Failed to save PPMS config:", e);
+    alert("Save failed — check the browser console for details.");
+  }
+}
+
+// ── View mode ─────────────────────────────────────────────────────────────
+
+async function ovPpmsRender() {
+  if (_ovPpmsCompounds === null) {
+    _ovPpmsCompounds = await ovPpmsLoadFromServer();
+  }
+  const container = document.getElementById("ov-ppms");
+  if (!container) return;
+  container.innerHTML = "";
+  _ovPpmsCompounds.forEach((c, idx) => container.appendChild(ovPpmsMakeCard(c, idx)));
+}
+
+function ovPpmsMakeCard(c, idx) {
+  const card = document.createElement("div");
+  card.className = "ov-ppms-card";
+  card.dataset.idx = idx;
+
+  // Header
+  const hdr = document.createElement("div");
+  hdr.className = "ov-ppms-card-header";
+  hdr.innerHTML = `
+    <div class="ov-ppms-card-name">${esc(c.name)}</div>
+    <div class="ov-ppms-card-desc">${esc(c.description) || '<span style="color:var(--fg-muted);font-style:italic">No description</span>'}</div>
+    <button class="ov-ppms-edit-btn auth-write" title="Edit compound" onclick="ovPpmsStartEdit(${idx})">✎ Edit</button>
+  `;
+  card.appendChild(hdr);
+
+  // Category sections
+  let hasAnyImage = false;
+  OV_PPMS_CATS.forEach(cat => {
+    const imgs = c[cat.key] || [];
+    if (!imgs.length) return;
+    hasAnyImage = true;
+
+    const sec = document.createElement("div");
+    sec.className = "ov-ppms-cat-section";
+
+    const lbl = document.createElement("div");
+    lbl.className = "ov-graph-subheading";
+    lbl.textContent = cat.label;
+    sec.appendChild(lbl);
+
+    const row = document.createElement("div");
+    row.className = "ov-graph-row";
+    imgs.forEach(file => {
+      const gc = document.createElement("div");
+      gc.className = "ov-graph-card" + (imgs.length === 1 ? " ov-graph-card--wide" : "");
+      gc.innerHTML = `<img src="/static/images/ppms/${esc(file)}" alt="${esc(file)}" loading="lazy">`;
+      row.appendChild(gc);
+    });
+    sec.appendChild(row);
+    card.appendChild(sec);
+  });
+
+  if (!hasAnyImage) {
+    const empty = document.createElement("div");
+    empty.className = "ov-ppms-empty";
+    empty.textContent = "No graphs assigned yet — click Edit to add images.";
+    card.appendChild(empty);
+  }
+
+  return card;
+}
+
+// ── Edit mode ─────────────────────────────────────────────────────────────
+
+function ovPpmsStartEdit(idx) {
+  const c = _ovPpmsCompounds?.[idx];
+  const card = document.querySelector(`.ov-ppms-card[data-idx="${idx}"]`);
+  if (!card) return;
+
+  card.innerHTML = "";
+  card.classList.add("ov-ppms-card--editing");
+
+  // Name
+  const nameRow = document.createElement("div");
+  nameRow.className = "ov-ppms-field";
+  nameRow.innerHTML = `<label>Name</label><input class="ov-ppms-inp ov-ppms-name-inp" value="${esc(c.name)}" placeholder="Compound name">`;
+  card.appendChild(nameRow);
+
+  // Description
+  const descRow = document.createElement("div");
+  descRow.className = "ov-ppms-field";
+  descRow.innerHTML = `<label>Description</label><input class="ov-ppms-inp ov-ppms-desc-inp" value="${esc(c.description)}" placeholder="e.g. Representative: 4Cl-Mn-BA - 1">`;
+  card.appendChild(descRow);
+
+  // Image categories
+  OV_PPMS_CATS.forEach(cat => {
+    const sec = document.createElement("div");
+    sec.className = "ov-ppms-edit-cat";
+    sec.dataset.cat = cat.key;
+
+    const catHdr = document.createElement("div");
+    catHdr.className = "ov-ppms-edit-cat-hdr";
+    catHdr.innerHTML = `<span class="ov-graph-subheading" style="margin:0">${cat.label}</span>`;
+    sec.appendChild(catHdr);
+
+    const imgList = document.createElement("div");
+    imgList.className = "ov-ppms-edit-imglist";
+    (c[cat.key] || []).forEach(file => imgList.appendChild(ovPpmsMakeEditThumb(file)));
+    sec.appendChild(imgList);
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "ov-ppms-add-img-btn auth-write";
+    addBtn.textContent = "+ Add image";
+    addBtn.onclick = () => ovPpmsTogglePicker(idx, cat.key, sec, addBtn);
+    sec.appendChild(addBtn);
+
+    card.appendChild(sec);
+  });
+
+  // Actions
+  const actions = document.createElement("div");
+  actions.className = "ov-ppms-edit-actions";
+  actions.innerHTML = `
+    <button class="ov-ppms-done-btn" onclick="ovPpmsSaveEdit(${idx})">✓ Done</button>
+    <button class="ov-ppms-del-btn auth-write" onclick="ovPpmsDeleteCompound(${idx})">Remove compound</button>
+  `;
+  card.appendChild(actions);
+}
+
+function ovPpmsMakeEditThumb(file) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-ppms-edit-thumb";
+  wrap.dataset.file = file;
+  wrap.innerHTML = `
+    <img src="/static/images/ppms/${esc(file)}" alt="${esc(file)}" loading="lazy">
+    <div class="ov-ppms-edit-thumb-name">${esc(file)}</div>
+    <button class="ov-ppms-remove-img auth-write" title="Remove" onclick="this.closest('.ov-ppms-edit-thumb').remove()">×</button>
+  `;
+  return wrap;
+}
+
+// ── Image picker ──────────────────────────────────────────────────────────
+
+function ovPpmsTogglePicker(idx, catKey, catSection, triggerBtn) {
+  const existing = catSection.querySelector(".ov-ppms-picker");
+  if (existing) { existing.remove(); return; }
+
+  // Close any other open pickers
+  document.querySelectorAll(".ov-ppms-picker").forEach(p => p.remove());
+
+  const picker = document.createElement("div");
+  picker.className = "ov-ppms-picker";
+
+  const grid = document.createElement("div");
+  grid.className = "ov-ppms-picker-grid";
+
+  OV_PPMS_IMAGES.forEach(img => {
+    const thumb = document.createElement("div");
+    thumb.className = "ov-ppms-picker-item";
+    thumb.innerHTML = `
+      <img src="/static/images/ppms/${esc(img.file)}" alt="${esc(img.label)}" loading="lazy">
+      <div class="ov-ppms-picker-item-label">${esc(img.label)}</div>
+    `;
+    thumb.onclick = () => {
+      const imgList = catSection.querySelector(".ov-ppms-edit-imglist");
+      imgList.appendChild(ovPpmsMakeEditThumb(img.file));
+      picker.remove();
+    };
+    grid.appendChild(thumb);
+  });
+
+  picker.appendChild(grid);
+  triggerBtn.insertAdjacentElement("afterend", picker);
+}
+
+async function ovPpmsSaveEdit(idx) {
+  const card = document.querySelector(`.ov-ppms-card[data-idx="${idx}"]`);
+  if (!card || !_ovPpmsCompounds) return;
+
+  _ovPpmsCompounds[idx].name        = card.querySelector(".ov-ppms-name-inp")?.value.trim() || _ovPpmsCompounds[idx].name;
+  _ovPpmsCompounds[idx].description = card.querySelector(".ov-ppms-desc-inp")?.value.trim() || "";
+
+  OV_PPMS_CATS.forEach(cat => {
+    const sec = card.querySelector(`.ov-ppms-edit-cat[data-cat="${cat.key}"]`);
+    if (!sec) return;
+    _ovPpmsCompounds[idx][cat.key] = Array.from(sec.querySelectorAll(".ov-ppms-edit-thumb"))
+      .map(el => el.dataset.file);
+  });
+
+  await ovPpmsSaveToServer();
+  ovPpmsRender();
+}
+
+async function ovPpmsDeleteCompound(idx) {
+  if (!confirm("Remove this compound from the overview?")) return;
+  if (!_ovPpmsCompounds) return;
+  _ovPpmsCompounds.splice(idx, 1);
+  await ovPpmsSaveToServer();
+  ovPpmsRender();
+}
+
+async function ovPpmsAddCompound() {
+  if (!_ovPpmsCompounds) _ovPpmsCompounds = await ovPpmsLoadFromServer();
+  _ovPpmsCompounds.push({ id: "cpd-" + Date.now(), name: "New Compound", description: "",
+    vsm: [], hc: [], phase_diagram: [] });
+  await ovPpmsSaveToServer();
+  await ovPpmsRender();
+  setTimeout(() => ovPpmsStartEdit(_ovPpmsCompounds.length - 1), 30);
 }

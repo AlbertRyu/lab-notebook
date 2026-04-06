@@ -1,5 +1,4 @@
 <div class="page active" id="page-overview">
-  <div id="ov-cover"></div>
   <div id="ov-content">
     <div id="ov-title-row">
       <span id="ov-icon">🔬</span>
@@ -7,28 +6,63 @@
     </div>
     <textarea id="ov-description" rows="2" placeholder="Add a description… What is this project about?" oninput="ovSave()"></textarea>
 
-    <!-- Properties -->
-    <div class="ov-section-title">⚙️ Properties</div>
-    <div id="ov-props">
-      <div class="ov-prop-key">👤 Principal Investigator</div>
-      <div class="ov-prop-val"><input id="ov-prop-pi" class="ov-editable" placeholder="Name…" oninput="ovSave()"></div>
-      <div class="ov-prop-key">🏛️ Affiliation</div>
-      <div class="ov-prop-val"><input id="ov-prop-affil" class="ov-editable" placeholder="Institution…" oninput="ovSave()"></div>
-      <div class="ov-prop-key">🗓️ Start Date</div>
-      <div class="ov-prop-val"><input id="ov-prop-start" class="ov-editable" type="date" oninput="ovSave()"></div>
-      <div class="ov-prop-key">🧪 Material Family</div>
-      <div class="ov-prop-val"><input id="ov-prop-compound" class="ov-editable" placeholder="e.g. Hybrid Perovskites…" oninput="ovSave()"></div>
-      <div class="ov-prop-key">📌 Status</div>
-      <div class="ov-prop-val">
-        <select id="ov-prop-status" class="ov-editable" style="padding:0" onchange="ovUpdateStatus(); ovSave()">
-          <option value="active">🟢 Active</option>
-          <option value="paused">🟡 Paused</option>
-          <option value="completed">✅ Completed</option>
-          <option value="planning">🔵 Planning</option>
-        </select>
-      </div>
-      <div class="ov-prop-key">📋 Notes</div>
-      <div class="ov-prop-val"><input id="ov-prop-notes" class="ov-editable" placeholder="Any quick notes…" oninput="ovSave()"></div>
+    <!-- Overview of Data Collection -->
+    <div class="ov-section-title">📋 Overview of Data Collection</div>
+    <div class="ov-table-wrap">
+      <table class="ov-progress-table">
+        <thead>
+          <tr>
+            <th rowspan="2">Chemical</th>
+            <th rowspan="2">Sample Screening</th>
+            <th rowspan="2">X-ray Diffraction</th>
+            <th colspan="2">Phase Diagram Mapping</th>
+          </tr>
+          <tr>
+            <th>In Plane</th>
+            <th>Out of Plane</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>4Cl-Mn-BA</td><td>✅</td><td>⚠️</td><td>⚠️</td><td>⚠️</td></tr>
+          <tr><td>4Br-Mn-BA</td><td>✅</td><td>✅</td><td>✅</td><td>🔴</td></tr>
+          <tr><td>4H-Mn-BA</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>⚠️</td></tr>
+          <tr><td>4I-Mn-BA</td><td>🔴</td><td>🔴</td><td>⚠️</td><td>⚠️</td></tr>
+          <tr><td>4F-Mn-BA</td><td>🔴</td><td>🔴</td><td>🔴</td><td>🔴</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="ov-legend">
+      <span>✅ Data complete and usable</span>
+      <span>⚠️ Partially exist or needs improvement</span>
+      <span>🔴 Not yet collected or unusable</span>
+    </div>
+
+    <!-- Lattice Parameters -->
+    <div class="ov-section-title" style="margin-top:28px">🔷 Lattice Parameters of Group Mn-BA</div>
+    <div class="ov-cif-link">CIF Files: <a href="https://seafile.xiaomie-cloud.de/d/d21b0f23e4d54b4abbe9/?p=%2F&mode=list" target="_blank">seafile.xiaomie-cloud.de</a></div>
+    <div class="ov-table-wrap">
+      <table class="ov-lattice-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>4Cl-Mn-BA</th>
+            <th>4Br-Mn-BA</th>
+            <th>4H-Mn-BA</th>
+            <th>4F-Mn-BA</th>
+            <th>4I-Mn-BA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Space Group</td><td>C1c1 Monoclinic</td><td>C1c1 Monoclinic</td><td>C1c1 Monoclinic</td><td>Pbnm Orthorhombic</td><td>Pbnm Orthorhombic</td></tr>
+          <tr><td>Polarity</td><td>Polar</td><td>Polar</td><td>Polar</td><td>Non polar</td><td>Non polar</td></tr>
+          <tr><td><em>a</em> (Å)</td><td>34.40</td><td>35.15</td><td>32.5301</td><td>5.15</td><td>5.15300</td></tr>
+          <tr><td><em>b</em> (Å)</td><td>5.18</td><td>5.19</td><td>5.1656</td><td>10.41</td><td>10.41400</td></tr>
+          <tr><td><em>c</em> (Å)</td><td>10.41</td><td>10.46</td><td>10.3365</td><td>32.05</td><td>32.05100</td></tr>
+          <tr><td><em>α</em> (°)</td><td>90</td><td>90</td><td>90</td><td>90</td><td>90</td></tr>
+          <tr><td><em>β</em> (°)</td><td>98.61</td><td>98.47</td><td>98.37</td><td>90</td><td>90</td></tr>
+          <tr><td><em>γ</em> (°)</td><td>90</td><td>90</td><td>90</td><td>90</td><td>90</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Stats -->
@@ -83,6 +117,13 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Representative Graphs (PPMS) — dynamically rendered by overview.js -->
+    <div class="ov-section-title" style="margin-top:28px">
+      📈 Representative Graphs — Single Crystal Samples (PPMS)
+      <button id="ov-ppms-add-btn" class="auth-write" onclick="ovPpmsAddCompound()" style="margin-left:auto;font-size:11px;padding:2px 10px">+ Add compound</button>
+    </div>
+    <div id="ov-ppms"></div>
 
     <!-- Goals / Milestones -->
     <div class="ov-section-title">🎯 Goals &amp; Milestones</div>

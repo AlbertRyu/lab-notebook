@@ -1,0 +1,36 @@
+﻿Sample Name,DC-Magnetisim,HeatCapacity,Hysteresis,Make Date,Mass (mg),Note,Sample Type,XRD
+Mn-PEA - 1,"0P001T_ZFC, 0P01T_ZFC, 0P1T_ZFC, 10T_ZFC, 1T_ZFC",,"10K, 15K, 20K, 25K, 2P5K, 30K, 32K, 34K, 36K, 38K, 40K, 41K, 42K, 43K, 44K, 45K, 5K, 60K",15/07/2024,9.12,This Sample is used to make to phasd diagram,Single Crystal - OOP,Not started
+4Cl-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,01/10/2024,20.13,"For this chemical, we have a few good single crystal sample.",Single Crystal - IP,Done
+4F-Mn-PEA - 1,"0P01T_FC, 0P01T_ZFC, 0P05T_FC, 0P05T_ZFC, 0P1T_FC, 0P1T_ZFC, 0P5T_ZFC, 10T_FC, 10T_ZFC, 1P4T_FC, 1P4T_ZFC",,"2P5K, 39K, 60K",27/09/2024,9.78,First sample of this chemical.,Coarse Powder,Not started
+"Mn-PEA - 2 ",,,,02/12/2024,11.18,"Two sample is made in this batch, in order to gain Mn-PEA powder data as reference to other materials. ",Fine Powder,Not started
+4F-Mn-PEA - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,2P5K,30/09/2024,8.43,To compare fine and coarse powder.,Fine Powder,Not started
+4F-Mn-PEA - 3,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 0P5T_ZFC",,2P5K,03/10/2024,10.74,This Sample is made for reproducibility checking.,Fine Powder,Not started
+4Cl-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,02/10/2024,18.88,Same crystal as previous sample. Lost some mass when changing orientation,Single Crystal - OOP,Not started
+4Cl-Mn-BA  - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,16/10/2024,75.59,"This sample is made for reproducibility check. ",Single Crystal - IP,Not started
+4Cl-Mn-BA - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,"2P5K, 35K, 45K",18/10/2024,42.96,"Same Crystal as previous One, Orientation Changed.",Single Crystal - OOP,Not started
+4H-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,06/12/2024,9.05,"the first sample of 4H. ",Single Crystal - IP,Not started
+4H-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,09/12/2024,4.33,Same sample of previous one. Change the orientation. Lost some mass.,Single Crystal - OOP,Not started
+4F-Mn-BA - 1,,,,10/12/2024,4.31,"The sample is very thin. It falled off from the sample holder in the experiment. But it has been retirved and is intact. ",Single Crystal - IP,Not started
+4F-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,2P5K,28/01/2025,3.06,The sample is made out of the 4F-Mn-BA - 1. The same crystal.,Single Crystal - IP,Not started
+4F-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 1P4T_FC",,2P5K,29/01/2025,1.2,"The sample made out of the previous 4F-Mn-BA - 2 Inplane sameple, same crystal.",Single Crystal - OOP,Not started
+4Br-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 1P4T_FC",,2P5K,30/01/2025,9.28,"The sample is the first chemical of this kind. ",Single Crystal - IP,Not started
+4Br-Mn-BA - 1,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 1P4T_FC",,2P5K,31/01/2025,4.22,THe sample is made out of the 4Br-Mn-BA - 1 Inplane sample. Same Crystal.,Single Crystal - OOP,Not started
+4F-Mn-BA -2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,2P5K,04/02/2025,0.5,"This is a new crystal. Looks very not like a single crystal. And also appears like that in the data. Thus, no further OUT-OF-Plane data is made out of it.",Single Crystal - IP,Not started
+4Cl-Mn-BA - 3,0P1T_ZFC,"0Oe, 1000Oe, 100Oe",,18/03/2025,2.87,"For the HC ",Single Crystal,Not started
+Mn-PEA - 3,0P1T_ZFC,1000Oe,,03/04/2025,7.73,For HC experiment,Single Crystal,Not started
+4H-Mn-BA - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,05/02/2025,10.36,,Single Crystal - IP,Not started
+4H-Mn-BA - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC, 14T_FC",,2P5K,06/02/2025,3.46,,Single Crystal - OOP,Not started
+4Br-Mn-BA - HC,,0Oe,,06/03/2025,0.33,,Single Crystal,Not started
+4Cl-Mn-BA - 4,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC","0Oe, 100Oe",2P5K,02/05/2025,1.88,,Single Crystal,Not started
+4H-Mn-BA - 3,0P1T_ZFC,"0Oe, 1000Oe",,13/05/2025,1.55,,Single Crystal,Not started
+4Cl-Mn-BA - 3,0P01T_ZFC,,,17/11/2025,10.85,,Single Crystal - OOP,Not started
+4H-Mn-BA - 4,0P01T_FC,,,17/11/2025,8.09,,Single Crystal - OOP,Not started
+4Br-Mn-BA - 2,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,,17/11/2025,9.69,,Single Crystal - OOP,Not started
+4I-Mn-BA - 1,0P01T_ZFC,,,18/11/2025,8.89,,Single Crystal - OOP,Not started
+4Cl-Mn-BA - 4,0P01T_ZFC,,,18/11/2025,12.43,,Single Crystal - OOP,Not started
+,,,,,,,,Not started
+4Br-,,,,,,,,Not started
+4Br-Mn-BA - 3,0P01T_ZFC,,,19/11/2025,6.57,,Single Crystal - OOP,Not started
+4H-Mn-BA - 5,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,2P5K,18/11/2025,9.82,,Single Crystal - OOP,Not started
+4I-Mn-BA - 2,0P01T_ZFC,,,19/11/2025,7.54,,Single Crystal - OOP,Not started
+4Cl-Mn-BA - 5,"0P01T_FC, 0P01T_ZFC, 0P1T_FC, 0P1T_ZFC",,2P5K,19/11/2025,12.84,,Single Crystal - OOP,Not started

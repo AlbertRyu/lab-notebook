@@ -202,6 +202,34 @@ def _seed_if_empty():
         scanner.scan(session, _get_scan_roots())
 
 
+# ── PPMS config (JSON file on disk) ───────────────────────────────────────
+
+PPMS_CONFIG_PATH = DATA_DIR_PATH / "ppms_config.json"
+
+
+@app.get("/api/ppms-config")
+def get_ppms_config():
+    if PPMS_CONFIG_PATH.exists():
+        try:
+            return json.loads(PPMS_CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
+
+
+@app.post("/api/ppms-config")
+async def save_ppms_config(request: Request):
+    require_write_auth(request)
+    data = await request.json()
+    if not isinstance(data, list):
+        raise HTTPException(400, "Expected a JSON array")
+    PPMS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PPMS_CONFIG_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"ok": True}
+
+
 # ── Static files ───────────────────────────────────────────────────────────
 
 app.mount("/files", StaticFiles(directory=str(DATA_DIR_PATH)), name="files")
