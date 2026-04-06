@@ -288,6 +288,7 @@ def get_sample(sample_id: int, session: Session = Depends(get_session)):
                 exp_date=exp.exp_date,
                 notes=exp.notes,
                 orientation=exp.orientation,
+                mass=exp.mass,
                 files=[
                     DataFileRead(
                         id=f.id, filename=f.filename, path=f.path, file_type=f.file_type

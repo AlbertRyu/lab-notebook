@@ -1,14 +1,17 @@
 """
 Directory scanner: walks configured root directories and imports measurements into DB.
 
-Scanning strategy (applied per folder, in priority order):
-  1. meta.yaml with 'sample' field  → explicit measurement metadata
-  2. No meta.yaml, .dat files found → auto-extract metadata from PPMS file headers
-  3. None of the above              → skip folder, but still recurse into subfolders
+Scanning strategy per folder:
+  - Always try PPMS header auto-extraction from .dat files (unless inside an already-
+    identified measurement, to avoid duplicates).
+  - Always read meta.yaml if present.
+  - Merge both sources: PPMS header as base, meta.yaml overrides on conflict.
+  - If merged result has 'sample' + 'type' → import as a measurement.
+  - Otherwise → skip this folder and recurse into subfolders.
 
 meta.yaml (sits inside the measurement folder alongside data files):
-  sample: <sample name>        # required – which sample this measurement belongs to
-  type: ppms-vsm               # required – ppms-vsm | ppms-hc | pxrd | sxrd | fmr | microscopy
+  sample: <sample name>        # which sample this measurement belongs to
+  type: ppms-vsm               # ppms-vsm | ppms-hc | pxrd | sxrd | fmr | microscopy
   date: 2026-01-15             # optional – measurement date
   notes: ""                    # optional – free-text notes
   orientation: OOP             # optional – ppms-vsm only; e.g. "OOP", "IP", or custom text
@@ -37,7 +40,11 @@ DATA_EXTS = {".dat", ".xy", ".xye", ".csv", ".txt", ".asc"}
 
 
 def _file_type(path: Path) -> str:
-    return "image" if path.suffix.lower() in IMAGE_EXTS else "data"
+    if path.suffix.lower() in IMAGE_EXTS:
+        return "image"
+    if "log" in path.name.lower():
+        return "log"
+    return "data"
 
 
 def _read_meta_yaml(folder: Path) -> Optional[dict]:
@@ -121,13 +128,20 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         select(Experiment).where(Experiment.source_path == source_path)
     ).first()
     if exp is None:
+        is_ppms = exp_type in {"ppms-vsm", "ppms-hc"}
         orientation = meta.get("orientation") if exp_type == "ppms-vsm" else None
+        raw_mass = meta.get("mass") if is_ppms else None
+        try:
+            mass = float(raw_mass) if raw_mass is not None else None
+        except (ValueError, TypeError):
+            mass = None
         exp = Experiment(
             sample_id=sample.id,
             type=exp_type,
             exp_date=meta.get("date"),
             notes=meta.get("notes"),
             orientation=orientation or None,
+            mass=mass,
             source_path=source_path,
         )
         session.add(exp)
@@ -157,37 +171,37 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         added["files"] += 1
 
 
+def _merge_meta(ppms: dict, yaml: dict) -> dict:
+    """Merge PPMS header metadata with meta.yaml. yaml wins on conflict."""
+    merged = {**ppms}
+    for k, v in yaml.items():
+        if v is not None and v != "":
+            merged[k] = v
+    return merged
+
+
 def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: bool = False):
     """Recursively process a folder.
 
-    within_measurement=True means this folder is inside a parent measurement that was
-    identified by auto-extraction (no meta.yaml). In that case we skip auto-extraction
-    here to avoid creating duplicate experiments for subfolders.
+    within_measurement=True means this folder is already inside an identified measurement;
+    PPMS auto-extraction is skipped to avoid creating duplicate experiments for subfolders.
+    meta.yaml is always read regardless.
     """
     if not folder.is_dir() or folder.name.startswith("."):
         return
 
-    meta = _read_meta_yaml(folder)
+    yaml_meta = _read_meta_yaml(folder) or {}
+    ppms_meta = _extract_ppms_meta(folder) or {} if not within_measurement else {}
+    merged = _merge_meta(ppms_meta, yaml_meta)
 
-    if meta is not None and meta.get("sample"):
-        # New-format explicit measurement
-        _upsert_measurement(session, folder, meta, added)
+    if merged.get("sample") and merged.get("type"):
+        _upsert_measurement(session, folder, merged, added)
         for sub in sorted(folder.iterdir()):
             if sub.is_dir():
                 _scan_dir(session, sub, added, within_measurement=True)
         return
 
-    if not within_measurement:
-        # Try PPMS header auto-extraction
-        auto_meta = _extract_ppms_meta(folder)
-        if auto_meta:
-            _upsert_measurement(session, folder, auto_meta, added)
-            for sub in sorted(folder.iterdir()):
-                if sub.is_dir():
-                    _scan_dir(session, sub, added, within_measurement=True)
-            return
-
-    # No measurement found here: recurse into subfolders
+    # No measurement identified: recurse into subfolders
     for sub in sorted(folder.iterdir()):
         if sub.is_dir():
             _scan_dir(session, sub, added, within_measurement=within_measurement)

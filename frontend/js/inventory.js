@@ -118,13 +118,16 @@ function invRenderMeasurements(s) {
     ${s.experiments.map((exp) => {
       const images    = exp.files.filter((f) => f.file_type === "image" || f.file_type === "screenshot");
       const dataFiles = exp.files.filter((f) => f.file_type === "data");
+      const logFiles  = exp.files.filter((f) => f.file_type === "log");
       const label     = typeLabel[exp.type] || exp.type.toUpperCase();
       const isCustomOrient = exp.orientation && exp.orientation !== "OOP" && exp.orientation !== "IP";
+      const isPpms = exp.type === "ppms-vsm" || exp.type === "ppms-hc";
       return `<div class="meas-card" id="meas-${exp.id}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span class="tag tag-${exp.type}">${label}</span>
           ${exp.exp_date ? `<span style="font-size:11px;color:var(--fg-muted);">${exp.exp_date}</span>` : ""}
           ${exp.type === "ppms-vsm" && exp.orientation ? `<span style="font-size:11px;color:var(--fg-muted);background:var(--bg-2,#eee);padding:1px 6px;border-radius:3px;">${esc(exp.orientation)}</span>` : ""}
+          ${isPpms && exp.mass != null ? `<span style="font-size:11px;color:var(--fg-muted);background:var(--bg-2,#eee);padding:1px 6px;border-radius:3px;">${exp.mass} mg</span>` : ""}
           <div style="flex:1"></div>
           <button class="danger auth-write" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
         </div>
@@ -145,6 +148,21 @@ function invRenderMeasurements(s) {
             <div style="display:flex;gap:6px;margin-top:4px;">
               <button style="font-size:11px;padding:3px 8px;" class="primary auth-write" onclick="invSaveOrientation(${exp.id})">Save</button>
               <button style="font-size:11px;padding:3px 8px;" onclick="invCancelOrientation(${exp.id})">Cancel</button>
+            </div>
+          </div>
+        </div>` : ""}
+
+        ${isPpms ? `
+        <div style="margin-bottom:10px;">
+          <div class="sec-label">Mass (mg)</div>
+          <div class="exp-notes-view auth-write" id="exp-mass-view-${exp.id}" onclick="invStartEditMass(${exp.id})" title="Click to edit">${exp.mass != null ? exp.mass : "Click to set mass…"}</div>
+          <div id="exp-mass-edit-${exp.id}" style="display:none;">
+            <input id="exp-mass-inp-${exp.id}" type="number" step="any" min="0" placeholder="e.g. 2.5"
+              value="${exp.mass != null ? exp.mass : ""}"
+              style="width:100%;box-sizing:border-box;">
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button style="font-size:11px;padding:3px 8px;" class="primary auth-write" onclick="invSaveMass(${exp.id})">Save</button>
+              <button style="font-size:11px;padding:3px 8px;" onclick="invCancelMass(${exp.id})">Cancel</button>
             </div>
           </div>
         </div>` : ""}
@@ -178,7 +196,7 @@ function invRenderMeasurements(s) {
             : `<div style="font-size:12px;color:var(--fg-muted);">No photos</div>`}
         </div>
 
-        <div>
+        <div style="margin-bottom:10px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
             <span class="sec-label">Data Files</span>
             <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('ed-upload-${exp.id}').click()">+ File</button>
@@ -192,6 +210,22 @@ function invRenderMeasurements(s) {
                   <button class="f-del auth-write" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
                 </div>`).join("")}</div>`
             : `<div style="font-size:12px;color:var(--fg-muted);">No data files</div>`}
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span class="sec-label">Log Files</span>
+            <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('el-upload-${exp.id}').click()">+ Log</button>
+            <input type="file" multiple id="el-upload-${exp.id}" style="display:none" onchange="invUploadExpFile(${exp.id},'log',this)">
+          </div>
+          ${logFiles.length
+            ? `<div class="file-list">${logFiles.map((f) => `
+                <div class="file-row">
+                  <span class="fname" style="color:var(--fg-dim);">${esc(f.filename)}</span>
+                  <a href="/files/${esc(f.path)}" download="${esc(f.filename)}">↓</a>
+                  <button class="f-del auth-write" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
+                </div>`).join("")}</div>`
+            : `<div style="font-size:12px;color:var(--fg-muted);">No log files</div>`}
         </div>
       </div>`;
     }).join("")}`;
@@ -256,7 +290,7 @@ async function invSaveNote(expId) {
   await api(`/api/experiments/${expId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: body, orientation: exp.orientation }),
+    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: body, orientation: exp.orientation, mass: exp.mass }),
   });
   if (inv.current) await invSelectSample(inv.current.id);
 }
@@ -290,7 +324,34 @@ async function invSaveOrientation(expId) {
   await api(`/api/experiments/${expId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: exp.notes, orientation }),
+    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: exp.notes, orientation, mass: exp.mass }),
+  });
+  if (inv.current) await invSelectSample(inv.current.id);
+}
+
+// ── Inline mass editor (ppms-vsm / ppms-hc) ─────────────────────────────
+
+function invStartEditMass(expId) {
+  document.getElementById(`exp-mass-view-${expId}`).style.display = "none";
+  document.getElementById(`exp-mass-edit-${expId}`).style.display = "";
+  document.getElementById(`exp-mass-inp-${expId}`).focus();
+}
+
+function invCancelMass(expId) {
+  document.getElementById(`exp-mass-view-${expId}`).style.display = "";
+  document.getElementById(`exp-mass-edit-${expId}`).style.display = "none";
+}
+
+async function invSaveMass(expId) {
+  if (!ensureWriteAuth()) return;
+  const exp = inv.current?.experiments.find((e) => e.id === expId);
+  if (!exp) return;
+  const raw = document.getElementById(`exp-mass-inp-${expId}`).value.trim();
+  const mass = raw === "" ? null : parseFloat(raw);
+  await api(`/api/experiments/${expId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: exp.notes, orientation: exp.orientation, mass }),
   });
   if (inv.current) await invSelectSample(inv.current.id);
 }
@@ -416,6 +477,10 @@ function openAddExperiment() {
         <option value="pxrd">PXRD</option><option value="sxrd">SXRD</option><option value="microscopy">Microscopy</option>
       </select>
     </div>
+    <div class="form-row" id="f-mass-row">
+      <label>Mass (mg)</label>
+      <input id="f-exp-mass" type="number" step="any" min="0" placeholder="e.g. 2.5">
+    </div>
     <div class="form-row" id="f-orientation-row">
       <label>Orientation</label>
       <div>
@@ -438,12 +503,15 @@ function openAddExperiment() {
         ? (document.getElementById("f-orientation-custom").value.trim() || null)
         : sel;
     }
+    const isPpms = type === "ppms-vsm" || type === "ppms-hc";
+    const rawMass = isPpms ? document.getElementById("f-exp-mass").value.trim() : "";
     const payload = {
       sample_id: s.id,
       type,
       exp_date:    document.getElementById("f-exp-date").value  || null,
       notes:       document.getElementById("f-exp-notes").value.trim() || null,
       orientation,
+      mass: rawMass === "" ? null : parseFloat(rawMass),
     };
     await api("/api/experiments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     closeModal();
@@ -452,9 +520,12 @@ function openAddExperiment() {
 }
 
 function invToggleOrientationField() {
-  const type = document.getElementById("f-exp-type")?.value;
-  const row  = document.getElementById("f-orientation-row");
-  if (row) row.style.display = type === "ppms-vsm" ? "" : "none";
+  const type    = document.getElementById("f-exp-type")?.value;
+  const isPpms  = type === "ppms-vsm" || type === "ppms-hc";
+  const massRow = document.getElementById("f-mass-row");
+  const orientRow = document.getElementById("f-orientation-row");
+  if (massRow)   massRow.style.display   = isPpms       ? "" : "none";
+  if (orientRow) orientRow.style.display = type === "ppms-vsm" ? "" : "none";
 }
 
 function invToggleCustomOrientation() {

@@ -109,7 +109,8 @@ def extract_header_meta(path: str) -> dict:
       sample  – sample name (from SAMPLE_MATERIAL)
       type    – 'ppms-vsm' or 'ppms-hc' (from BYAPP)
       date    – datetime.date (from FILEOPENTIME)
-      notes   – free-text notes (from SAMPLE_COMMENT / SAMPLE_MASS)
+      notes   – free-text notes (from SAMPLE_COMMENT)
+      mass    – sample mass in mg as float (from SAMPLE_MASS)
     """
     meta: dict = {}
     try:
@@ -143,8 +144,10 @@ def extract_header_meta(path: str) -> dict:
                 elif key == "SAMPLE_COMMENT" and value:
                     meta.setdefault("notes", value)
                 elif key == "SAMPLE_MASS" and value:
-                    note = f"Mass: {value} mg"
-                    meta["notes"] = (meta["notes"] + "\n" + note).strip() if "notes" in meta else note
+                    try:
+                        meta["mass"] = float(value)
+                    except ValueError:
+                        pass
         elif s.startswith("FILEOPENTIME,"):
             parts = s.split(",")
             if len(parts) >= 3:

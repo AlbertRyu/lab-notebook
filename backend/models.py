@@ -24,6 +24,7 @@ class Experiment(SQLModel, table=True):
     exp_date: Optional[Date] = Field(default=None)
     notes: Optional[str] = Field(default=None)
     orientation: Optional[str] = Field(default=None)  # for ppms-vsm: "OOP", "IP", or custom text
+    mass: Optional[float] = Field(default=None)  # sample mass in mg (ppms-vsm / ppms-hc)
     source_path: Optional[str] = Field(default=None, index=True)  # folder path, used for dedup on scan
 
     sample: Optional[Sample] = Relationship(back_populates="experiments")
@@ -74,6 +75,7 @@ class ExperimentRead(SQLModel):
     exp_date: Optional[Date]
     notes: Optional[str]
     orientation: Optional[str] = None
+    mass: Optional[float] = None
     files: List[DataFileRead] = []
 
 
@@ -109,6 +111,7 @@ class ExperimentCreate(SQLModel):
     exp_date: Optional[Date] = None
     notes: Optional[str] = None
     orientation: Optional[str] = None
+    mass: Optional[float] = None
 
 
 # ── Notes ──────────────────────────────────────────────────────────────────
