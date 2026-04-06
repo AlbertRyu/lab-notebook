@@ -3,6 +3,7 @@ import json
 import hmac
 import base64
 import hashlib
+import shutil
 import time
 from pathlib import Path
 from typing import Optional
@@ -525,6 +526,25 @@ def delete_experiment(
         except Exception:
             pass
         session.delete(df)
+
+    # Also clean up files not tracked in DataFile (meta.yaml, .log files, etc.)
+    if exp.source_path:
+        source = Path(exp.source_path)
+        if source.is_dir():
+            try:
+                (source / "meta.yaml").unlink(missing_ok=True)
+            except Exception:
+                pass
+            for f in source.iterdir():
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+            try:
+                source.rmdir()  # succeeds only if now empty
+            except Exception:
+                pass
 
     session.delete(exp)
     session.commit()
