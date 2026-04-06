@@ -119,13 +119,35 @@ function invRenderMeasurements(s) {
       const images    = exp.files.filter((f) => f.file_type === "image" || f.file_type === "screenshot");
       const dataFiles = exp.files.filter((f) => f.file_type === "data");
       const label     = typeLabel[exp.type] || exp.type.toUpperCase();
+      const isCustomOrient = exp.orientation && exp.orientation !== "OOP" && exp.orientation !== "IP";
       return `<div class="meas-card" id="meas-${exp.id}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span class="tag tag-${exp.type}">${label}</span>
           ${exp.exp_date ? `<span style="font-size:11px;color:var(--fg-muted);">${exp.exp_date}</span>` : ""}
+          ${exp.type === "ppms-vsm" && exp.orientation ? `<span style="font-size:11px;color:var(--fg-muted);background:var(--bg-2,#eee);padding:1px 6px;border-radius:3px;">${esc(exp.orientation)}</span>` : ""}
           <div style="flex:1"></div>
           <button class="danger auth-write" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
         </div>
+
+        ${exp.type === "ppms-vsm" ? `
+        <div style="margin-bottom:10px;">
+          <div class="sec-label">Orientation</div>
+          <div class="exp-notes-view auth-write" id="exp-orient-view-${exp.id}" onclick="invStartEditOrientation(${exp.id})" title="Click to edit">${esc(exp.orientation || "Click to set orientation…")}</div>
+          <div id="exp-orient-edit-${exp.id}" style="display:none;">
+            <select id="exp-orient-sel-${exp.id}" onchange="invToggleCustomOrientationEdit(${exp.id})">
+              <option value="OOP"${!isCustomOrient && exp.orientation !== "IP" ? " selected" : ""}>Out-of-Plane (OOP)</option>
+              <option value="IP"${exp.orientation === "IP" ? " selected" : ""}>In-Plane (IP)</option>
+              <option value="custom"${isCustomOrient ? " selected" : ""}>Custom…</option>
+            </select>
+            <input id="exp-orient-custom-${exp.id}" type="text" placeholder="Custom orientation name"
+              value="${esc(isCustomOrient ? exp.orientation : "")}"
+              style="display:${isCustomOrient ? "" : "none"};margin-top:4px;width:100%;box-sizing:border-box;">
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button style="font-size:11px;padding:3px 8px;" class="primary auth-write" onclick="invSaveOrientation(${exp.id})">Save</button>
+              <button style="font-size:11px;padding:3px 8px;" onclick="invCancelOrientation(${exp.id})">Cancel</button>
+            </div>
+          </div>
+        </div>` : ""}
 
         <div style="margin-bottom:10px;">
           <div class="sec-label">Notes</div>
@@ -234,7 +256,41 @@ async function invSaveNote(expId) {
   await api(`/api/experiments/${expId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: body }),
+    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: body, orientation: exp.orientation }),
+  });
+  if (inv.current) await invSelectSample(inv.current.id);
+}
+
+// ── Inline orientation editor (ppms-vsm only) ────────────────────────────
+
+function invStartEditOrientation(expId) {
+  document.getElementById(`exp-orient-view-${expId}`).style.display = "none";
+  document.getElementById(`exp-orient-edit-${expId}`).style.display = "";
+}
+
+function invCancelOrientation(expId) {
+  document.getElementById(`exp-orient-view-${expId}`).style.display = "";
+  document.getElementById(`exp-orient-edit-${expId}`).style.display = "none";
+}
+
+function invToggleCustomOrientationEdit(expId) {
+  const sel    = document.getElementById(`exp-orient-sel-${expId}`)?.value;
+  const custom = document.getElementById(`exp-orient-custom-${expId}`);
+  if (custom) custom.style.display = sel === "custom" ? "" : "none";
+}
+
+async function invSaveOrientation(expId) {
+  if (!ensureWriteAuth()) return;
+  const exp = inv.current?.experiments.find((e) => e.id === expId);
+  if (!exp) return;
+  const sel = document.getElementById(`exp-orient-sel-${expId}`).value;
+  const orientation = sel === "custom"
+    ? (document.getElementById(`exp-orient-custom-${expId}`).value.trim() || null)
+    : sel;
+  await api(`/api/experiments/${expId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sample_id: exp.sample_id, type: exp.type, exp_date: exp.exp_date, notes: exp.notes, orientation }),
   });
   if (inv.current) await invSelectSample(inv.current.id);
 }
@@ -355,22 +411,54 @@ function openAddExperiment() {
   const s = inv.current;
   modalOpen("Add Experiment", `
     <div class="form-row"><label>Type *</label>
-      <select id="f-exp-type">
+      <select id="f-exp-type" onchange="invToggleOrientationField()">
         <option value="ppms-vsm">PPMS-VSM</option><option value="ppms-hc">PPMS-HC</option>
         <option value="pxrd">PXRD</option><option value="sxrd">SXRD</option><option value="microscopy">Microscopy</option>
       </select>
     </div>
+    <div class="form-row" id="f-orientation-row">
+      <label>Orientation</label>
+      <div>
+        <select id="f-orientation-select" onchange="invToggleCustomOrientation()">
+          <option value="OOP">Out-of-Plane (OOP)</option>
+          <option value="IP">In-Plane (IP)</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <input id="f-orientation-custom" type="text" placeholder="Custom orientation name" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;">
+      </div>
+    </div>
     <div class="form-row"><label>Date</label><input id="f-exp-date" type="date"></div>
     <div class="form-row"><label>Notes</label><textarea id="f-exp-notes"></textarea></div>
   `, async () => {
+    const type = document.getElementById("f-exp-type").value;
+    let orientation = null;
+    if (type === "ppms-vsm") {
+      const sel = document.getElementById("f-orientation-select").value;
+      orientation = sel === "custom"
+        ? (document.getElementById("f-orientation-custom").value.trim() || null)
+        : sel;
+    }
     const payload = {
       sample_id: s.id,
-      type:      document.getElementById("f-exp-type").value,
-      exp_date:  document.getElementById("f-exp-date").value  || null,
-      notes:     document.getElementById("f-exp-notes").value.trim() || null,
+      type,
+      exp_date:    document.getElementById("f-exp-date").value  || null,
+      notes:       document.getElementById("f-exp-notes").value.trim() || null,
+      orientation,
     };
     await api("/api/experiments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     closeModal();
     await invSelectSample(s.id);
   });
+}
+
+function invToggleOrientationField() {
+  const type = document.getElementById("f-exp-type")?.value;
+  const row  = document.getElementById("f-orientation-row");
+  if (row) row.style.display = type === "ppms-vsm" ? "" : "none";
+}
+
+function invToggleCustomOrientation() {
+  const sel    = document.getElementById("f-orientation-select")?.value;
+  const custom = document.getElementById("f-orientation-custom");
+  if (custom) custom.style.display = sel === "custom" ? "" : "none";
 }

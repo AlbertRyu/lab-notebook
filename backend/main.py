@@ -287,6 +287,7 @@ def get_sample(sample_id: int, session: Session = Depends(get_session)):
                 type=exp.type,
                 exp_date=exp.exp_date,
                 notes=exp.notes,
+                orientation=exp.orientation,
                 files=[
                     DataFileRead(
                         id=f.id, filename=f.filename, path=f.path, file_type=f.file_type
@@ -432,6 +433,7 @@ def create_experiment(
         type=exp.type,
         exp_date=exp.exp_date,
         notes=exp.notes,
+        orientation=exp.orientation,
         files=[],
     )
 
@@ -495,6 +497,7 @@ def update_experiment(
         type=exp.type,
         exp_date=exp.exp_date,
         notes=exp.notes,
+        orientation=exp.orientation,
         files=[
             DataFileRead(
                 id=f.id, filename=f.filename, path=f.path, file_type=f.file_type

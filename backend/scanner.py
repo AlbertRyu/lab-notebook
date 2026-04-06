@@ -2,16 +2,16 @@
 Directory scanner: walks configured root directories and imports measurements into DB.
 
 Scanning strategy (applied per folder, in priority order):
-  1. meta.yaml with 'sample' field  → new-format measurement (explicit metadata)
-  2. meta.yaml with 'name' field    → old-format sample dir (backward compat)
-  3. No meta.yaml, .dat files found → auto-extract metadata from PPMS file headers
-  4. None of the above              → skip folder, but still recurse into subfolders
+  1. meta.yaml with 'sample' field  → explicit measurement metadata
+  2. No meta.yaml, .dat files found → auto-extract metadata from PPMS file headers
+  3. None of the above              → skip folder, but still recurse into subfolders
 
-New-format meta.yaml (sits inside the measurement folder alongside data files):
+meta.yaml (sits inside the measurement folder alongside data files):
   sample: <sample name>        # required – which sample this measurement belongs to
   type: ppms-vsm               # required – ppms-vsm | ppms-hc | pxrd | sxrd | fmr | microscopy
   date: 2026-01-15             # optional – measurement date
   notes: ""                    # optional – free-text notes
+  orientation: OOP             # optional – ppms-vsm only; e.g. "OOP", "IP", or custom text
   # optional sample creation fields (only used when the sample doesn't exist yet):
   compound: Fe3O4
   synthesis_date: 2026-01-01
@@ -22,7 +22,7 @@ New-format meta.yaml (sits inside the measurement folder alongside data files):
 
 import os
 from pathlib import Path
-from typing import Optional, Iterator
+from typing import Optional
 
 import yaml
 from sqlmodel import Session, select
@@ -122,11 +122,13 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         select(Experiment).where(Experiment.source_path == source_path)
     ).first()
     if exp is None:
+        orientation = meta.get("orientation") if exp_type == "ppms-vsm" else None
         exp = Experiment(
             sample_id=sample.id,
             type=exp_type,
             exp_date=meta.get("date"),
             notes=meta.get("notes"),
+            orientation=orientation or None,
             source_path=source_path,
         )
         session.add(exp)

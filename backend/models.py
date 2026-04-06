@@ -23,6 +23,7 @@ class Experiment(SQLModel, table=True):
     type: str  # microscopy | pxrd | sxrd | ppms-vsm | ppms-hc | fmr
     exp_date: Optional[Date] = Field(default=None)
     notes: Optional[str] = Field(default=None)
+    orientation: Optional[str] = Field(default=None)  # for ppms-vsm: "OOP", "IP", or custom text
     source_path: Optional[str] = Field(default=None, index=True)  # folder path, used for dedup on scan
 
     sample: Optional[Sample] = Relationship(back_populates="experiments")
@@ -72,6 +73,7 @@ class ExperimentRead(SQLModel):
     type: str
     exp_date: Optional[Date]
     notes: Optional[str]
+    orientation: Optional[str] = None
     files: List[DataFileRead] = []
 
 
@@ -106,6 +108,7 @@ class ExperimentCreate(SQLModel):
     type: str
     exp_date: Optional[Date] = None
     notes: Optional[str] = None
+    orientation: Optional[str] = None
 
 
 # ── Notes ──────────────────────────────────────────────────────────────────
