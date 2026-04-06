@@ -34,7 +34,6 @@ SAMPLES_DIR = DATA_DIR / "samples"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"}
 DATA_EXTS = {".dat", ".xy", ".xye", ".csv", ".txt", ".asc"}
-EXP_TYPES = ["microscopy", "pxrd", "sxrd", "ppms-vsm", "ppms-hc", "fmr"]
 
 
 def _file_type(path: Path) -> str:
@@ -158,93 +157,6 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         added["files"] += 1
 
 
-def _walk_files_recursive(directory: Path) -> Iterator[Path]:
-    for root, _dirs, files in os.walk(directory, followlinks=True):
-        for fname in sorted(files):
-            yield Path(root) / fname
-
-
-def _process_old_format(session: Session, sample_dir: Path, meta: dict, added: dict):
-    """Handle old-format sample directory (meta.yaml with 'name' field)."""
-    sample_name = (meta.get("name") or "").strip() or sample_dir.name
-
-    sample = session.exec(select(Sample).where(Sample.name == sample_name)).first()
-    if sample is None:
-        sample = Sample(
-            name=sample_name,
-            compound=meta.get("compound", sample_name),
-            synthesis_date=meta.get("synthesis_date"),
-            batch=meta.get("batch"),
-            box=str(meta.get("box")) if meta.get("box") is not None else None,
-            crystal_size=meta.get("crystal_size"),
-            notes=meta.get("notes"),
-        )
-        session.add(sample)
-        session.flush()
-        added["samples"] += 1
-    else:
-        for attr, key in [
-            ("compound", "compound"), ("synthesis_date", "synthesis_date"),
-            ("batch", "batch"), ("crystal_size", "crystal_size"), ("notes", "notes"),
-        ]:
-            val = meta.get(key)
-            if val:
-                setattr(sample, attr, val)
-        if meta.get("box") is not None:
-            sample.box = str(meta["box"])
-        session.add(sample)
-        session.flush()
-
-    for exp_type in EXP_TYPES:
-        exp_dir = sample_dir / exp_type
-        if not exp_dir.is_dir():
-            continue
-
-        files_in_dir = [
-            f for f in _walk_files_recursive(exp_dir)
-            if f.suffix.lower() in IMAGE_EXTS | DATA_EXTS
-        ]
-        if not files_in_dir:
-            continue
-
-        source_path = str(exp_dir.resolve())
-
-        # Dedup: prefer source_path match, fall back to old (sample_id, type) key
-        exp = session.exec(
-            select(Experiment).where(Experiment.source_path == source_path)
-        ).first()
-        if exp is None:
-            exp = session.exec(
-                select(Experiment).where(
-                    Experiment.sample_id == sample.id,
-                    Experiment.type == exp_type,
-                    Experiment.source_path.is_(None),
-                )
-            ).first()
-        if exp is None:
-            exp = Experiment(sample_id=sample.id, type=exp_type, source_path=source_path)
-            session.add(exp)
-            session.flush()
-            added["experiments"] += 1
-        elif exp.source_path is None:
-            exp.source_path = source_path
-            session.add(exp)
-            session.flush()
-
-        for f in files_in_dir:
-            rel_path = f.relative_to(DATA_DIR).as_posix()
-            rel_name = f.relative_to(exp_dir).as_posix()
-            if session.exec(select(DataFile).where(DataFile.path == rel_path)).first():
-                continue
-            session.add(DataFile(
-                experiment_id=exp.id,
-                filename=rel_name,
-                path=rel_path,
-                file_type=_file_type(f),
-            ))
-            added["files"] += 1
-
-
 def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: bool = False):
     """Recursively process a folder.
 
@@ -263,11 +175,6 @@ def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: b
         for sub in sorted(folder.iterdir()):
             if sub.is_dir():
                 _scan_dir(session, sub, added, within_measurement=True)
-        return
-
-    if meta is not None and meta.get("name"):
-        # Old-format sample directory
-        _process_old_format(session, folder, meta, added)
         return
 
     if not within_measurement:
