@@ -44,7 +44,9 @@ def _file_type(path: Path) -> str:
         return "image"
     if "log" in path.name.lower():
         return "log"
-    return "data"
+    if path.suffix.lower() in DATA_EXTS:
+        return "data"
+    return "other"
 
 
 def _read_meta_yaml(folder: Path) -> Optional[dict]:
@@ -58,15 +60,39 @@ def _read_meta_yaml(folder: Path) -> Optional[dict]:
 
 
 def _extract_ppms_meta(folder: Path) -> Optional[dict]:
-    """Try PPMS header extraction from .dat files directly in this folder."""
+    """Try PPMS header extraction from .dat files directly in this folder.
+
+    Scans all .dat files and merges results: identity (sample+type) comes from
+    the best file, mass is taken from whichever file provides it. This handles
+    folders that contain mixed VSM/HC files where only HC files carry mass.
+    """
     from parsers.ppms import extract_header_meta
 
+    identity: Optional[dict] = None  # first file with sample+type
+    partial: Optional[dict] = None   # first file with any meta
+    mass: Optional[float] = None     # first mass found across all files
+
     for f in sorted(folder.iterdir()):
-        if f.is_file() and f.suffix.lower() == ".dat":
-            meta = extract_header_meta(str(f))
-            if meta.get("sample") and meta.get("type"):
-                return meta
-    return None
+        if not (f.is_file() and f.suffix.lower() == ".dat"):
+            continue
+        meta = extract_header_meta(str(f))
+        if not meta:
+            continue
+        if partial is None:
+            partial = meta
+        if identity is None and meta.get("sample") and meta.get("type"):
+            identity = meta
+        if mass is None and meta.get("mass") is not None:
+            mass = meta["mass"]
+        if identity is not None and mass is not None:
+            break  # have everything we need
+
+    best = identity or partial
+    if best is None:
+        return None
+    if mass is not None:
+        best = {**best, "mass": mass}
+    return best
 
 
 def _collect_files(folder: Path) -> list[Path]:
@@ -84,7 +110,7 @@ def _collect_files(folder: Path) -> list[Path]:
     for item in items:
         if item.name.startswith(".") or item.name == "meta.yaml":
             continue
-        if item.is_file() and item.suffix.lower() in IMAGE_EXTS | DATA_EXTS:
+        if item.is_file():
             result.append(item)
         elif item.is_dir():
             sub_meta = _read_meta_yaml(item)
@@ -127,14 +153,14 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
     exp = session.exec(
         select(Experiment).where(Experiment.source_path == source_path)
     ).first()
+    is_ppms = exp_type in {"ppms-vsm", "ppms-hc"}
+    orientation = meta.get("orientation") if exp_type == "ppms-vsm" else None
+    raw_mass = meta.get("mass") if is_ppms else None
+    try:
+        mass = float(raw_mass) if raw_mass is not None else None
+    except (ValueError, TypeError):
+        mass = None
     if exp is None:
-        is_ppms = exp_type in {"ppms-vsm", "ppms-hc"}
-        orientation = meta.get("orientation") if exp_type == "ppms-vsm" else None
-        raw_mass = meta.get("mass") if is_ppms else None
-        try:
-            mass = float(raw_mass) if raw_mass is not None else None
-        except (ValueError, TypeError):
-            mass = None
         exp = Experiment(
             sample_id=sample.id,
             type=exp_type,
@@ -147,6 +173,10 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         session.add(exp)
         session.flush()
         added["experiments"] += 1
+    elif mass is not None and exp.mass is None:
+        # Backfill mass if it was missing on first import (e.g. HC files)
+        exp.mass = mass
+        session.add(exp)
 
     for f in _collect_files(folder):
         try:
@@ -191,6 +221,8 @@ def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: b
         return
 
     yaml_meta = _read_meta_yaml(folder) or {}
+    if yaml_meta.get("skip"):
+        return
     ppms_meta = _extract_ppms_meta(folder) or {} if not within_measurement else {}
     merged = _merge_meta(ppms_meta, yaml_meta)
 

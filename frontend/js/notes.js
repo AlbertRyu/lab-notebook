@@ -195,6 +195,48 @@ async function deleteCurrentNote() {
   await notesBuildMentionTargets();
 }
 
+function downloadCurrentNote() {
+  if (!notes.current) return;
+
+  // Get current (possibly unsaved) content from the editor
+  const title = document.getElementById("note-title-input").value.trim() || "Untitled";
+  const body = document.getElementById("note-body").value;
+
+  // Slugify for filename
+  const slug = title.toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s-]+/g, '-')
+    .slice(0, 50) || "untitled";
+
+  const filename = `${slug}.md`;
+
+  // Use the same frontmatter format as the files on disk
+  const created_at = notes.current.created_at ? notes.current.created_at : "";
+  const updated_at = notes.current.updated_at ? notes.current.updated_at : "";
+
+  const content = (
+    "---\n"
+    + `id: ${notes.current.id}\n`
+    + `title: ${title}\n`
+    + `pinned: ${String(notes.current.pinned).toLowerCase()}\n`
+    + `created_at: ${created_at}\n`
+    + `updated_at: ${updated_at}\n`
+    + "---\n\n"
+    + body
+  );
+
+  // Create download
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function notesApplySearch() {
   const q = document.getElementById("notes-search-input").value.trim();
   notesLoadList(q);

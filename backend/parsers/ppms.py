@@ -133,6 +133,8 @@ def extract_header_meta(path: str) -> dict:
             app = parts[1].strip().upper() if len(parts) > 1 else ""
             if app == "VSM":
                 meta["type"] = "ppms-vsm"
+            elif app == "HEATCAPACITY":
+                meta["type"] = "ppms-hc"
             elif app == "HC":
                 meta["type"] = "ppms-hc"
         elif s.startswith("INFO,"):
@@ -144,6 +146,13 @@ def extract_header_meta(path: str) -> dict:
                 elif key == "SAMPLE_COMMENT" and value:
                     meta.setdefault("notes", value)
                 elif key == "SAMPLE_MASS" and value:
+                    # VSM format: INFO,<mass>,SAMPLE_MASS
+                    try:
+                        meta["mass"] = float(value)
+                    except ValueError:
+                        pass
+                elif key.startswith("MASS:") and value:
+                    # HC format: INFO,<mass>,MASS:Sample Mass (mg)
                     try:
                         meta["mass"] = float(value)
                     except ValueError:

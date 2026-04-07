@@ -18,7 +18,7 @@ const graph = {
   animId: null, lastTs: 0,
   resizeObserver: null,
   degree: {},
-  baseSize: { sample: 12, experiment: 10, note: 11 },
+  baseSize: { compound: 14, sample: 12, experiment: 10, note: 11 },
 };
 
 // ── Init ─────────────────────────────────────────────────────────────────
@@ -109,6 +109,7 @@ function graphNodeRadius(node) {
   return base + Math.min(6, Math.sqrt(degree));
 }
 function graphNodeLabel(node) {
+  if (node.kind === "compound")   return node.label || node.id;
   if (node.kind === "sample")     return node.label || `Sample #${node.id}`;
   if (node.kind === "experiment") return node.label || `Measurement #${node.id}`;
   return node.label || `Note #${node.id}`;
@@ -181,7 +182,13 @@ async function graphBuildData() {
     edges.push({ source, target, rel });
   }
 
-  samples.forEach((s) => addNode("sample", s.id, s.name, { hover: s.compound || "sample" }));
+  samples.forEach((s) => {
+    if (s.compound) addNode("compound", s.compound, s.compound, { hover: s.compound });
+    addNode("sample", s.id, s.name, { hover: s.name });
+  });
+  samples.forEach((s) => {
+    if (s.compound) addEdge(graphNodeKey("compound", s.compound), graphNodeKey("sample", s.id), "owns");
+  });
   sampleDetails.forEach((detail) => {
     if (!detail?.experiments) return;
     detail.experiments.forEach((exp) => {
@@ -270,8 +277,8 @@ function graphDraw() {
   const dark = document.documentElement.getAttribute("data-theme") === "dark"
             || document.documentElement.getAttribute("saved-theme") === "dark";
   const palette = dark
-    ? { text: "#f4f4f5", muted: "#a1a1aa", sample: "#60a5fa", experiment: "#4ade80", note: "#fbbf24", edge: "rgba(148,163,184,0.34)", edgeSoft: "rgba(148,163,184,0.12)", bgLine: "rgba(255,255,255,0.05)" }
-    : { text: "#111827", muted: "#555555", sample: "#2563eb", experiment: "#16a34a", note: "#f59e0b", edge: "rgba(100,116,139,0.26)", edgeSoft: "rgba(100,116,139,0.08)", bgLine: "rgba(17,24,39,0.04)" };
+    ? { text: "#f4f4f5", muted: "#a1a1aa", compound: "#a78bfa", sample: "#60a5fa", experiment: "#4ade80", note: "#fbbf24", edge: "rgba(148,163,184,0.34)", edgeSoft: "rgba(148,163,184,0.12)", bgLine: "rgba(255,255,255,0.05)" }
+    : { text: "#111827", muted: "#555555", compound: "#7c3aed", sample: "#2563eb", experiment: "#16a34a", note: "#f59e0b", edge: "rgba(100,116,139,0.26)", edgeSoft: "rgba(100,116,139,0.08)", bgLine: "rgba(17,24,39,0.04)" };
 
   const hovered   = graph.hoverKey;
   const activeSet = graphNeighborSet();
@@ -306,7 +313,7 @@ function graphDraw() {
     const radius = graphNodeRadius(node);
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle   = node.kind === "sample" ? palette.sample : node.kind === "experiment" ? palette.experiment : palette.note;
+    ctx.fillStyle   = palette[node.kind] || palette.note;
     ctx.globalAlpha = hovered && !active ? 0.26 : 1;
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -477,9 +484,9 @@ function graphStopAnimation() {
 function graphNodeClick(key) {
   const node = graphGetNodeByKey(key);
   if (!node) return;
-  if (node.kind === "sample")     mentionJumpSample(node.id);
+  if (node.kind === "sample")          mentionJumpSample(node.id);
   else if (node.kind === "experiment") mentionJumpExperiment(node.id);
-  else if (node.kind === "note")  mentionJumpNote(node.id);
+  else if (node.kind === "note")       mentionJumpNote(node.id);
 }
 
 async function graphRefresh() {

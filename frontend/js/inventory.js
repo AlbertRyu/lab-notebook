@@ -119,6 +119,7 @@ function invRenderMeasurements(s) {
       const images    = exp.files.filter((f) => f.file_type === "image" || f.file_type === "screenshot");
       const dataFiles = exp.files.filter((f) => f.file_type === "data");
       const logFiles  = exp.files.filter((f) => f.file_type === "log");
+      const otherFiles = exp.files.filter((f) => f.file_type === "other");
       const label     = typeLabel[exp.type] || exp.type.toUpperCase();
       const isCustomOrient = exp.orientation && exp.orientation !== "OOP" && exp.orientation !== "IP";
       const isPpms = exp.type === "ppms-vsm" || exp.type === "ppms-hc";
@@ -213,11 +214,14 @@ function invRenderMeasurements(s) {
         </div>
 
         <div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <span class="sec-label">Log Files</span>
-            <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="document.getElementById('el-upload-${exp.id}').click()">+ Log</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="invToggleLogSection(${exp.id})">
+            <span id="log-toggle-${exp.id}" style="font-size:10px;color:var(--fg-muted);">▶</span>
+            <span class="sec-label">Log Files (${logFiles.length})</span>
+            <div style="flex:1"></div>
+            <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="event.stopPropagation(); document.getElementById('el-upload-${exp.id}').click()">+ Log</button>
             <input type="file" multiple id="el-upload-${exp.id}" style="display:none" onchange="invUploadExpFile(${exp.id},'log',this)">
           </div>
+          <div id="log-content-${exp.id}" style="display:none;">
           ${logFiles.length
             ? `<div class="file-list">${logFiles.map((f) => `
                 <div class="file-row">
@@ -226,6 +230,27 @@ function invRenderMeasurements(s) {
                   <button class="f-del auth-write" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
                 </div>`).join("")}</div>`
             : `<div style="font-size:12px;color:var(--fg-muted);">No log files</div>`}
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="invToggleOtherSection(${exp.id})">
+            <span id="other-toggle-${exp.id}" style="font-size:10px;color:var(--fg-muted);">▶</span>
+            <span class="sec-label">Others (${otherFiles.length})</span>
+            <div style="flex:1"></div>
+            <button class="auth-write" style="font-size:11px;padding:2px 8px;" onclick="event.stopPropagation(); document.getElementById('eo-upload-${exp.id}').click()">+ File</button>
+            <input type="file" multiple id="eo-upload-${exp.id}" style="display:none" onchange="invUploadExpFile(${exp.id},'other',this)">
+          </div>
+          <div id="other-content-${exp.id}" style="display:none;">
+          ${otherFiles.length
+            ? `<div class="file-list">${otherFiles.map((f) => `
+                <div class="file-row">
+                  <span class="fname">${esc(f.filename)}</span>
+                  <a href="/files/${esc(f.path)}" download="${esc(f.filename)}">↓</a>
+                  <button class="f-del auth-write" title="Delete" onclick="invDeleteExpFile(${exp.id},${f.id})">✕</button>
+                </div>`).join("")}</div>`
+            : `<div style="font-size:12px;color:var(--fg-muted);">No other files</div>`}
+          </div>
         </div>
       </div>`;
     }).join("")}`;
@@ -433,7 +458,11 @@ function openAddSample() {
 async function deleteSample() {
   if (!ensureWriteAuth()) return;
   if (!inv.current) return;
-  if (!confirm(`Delete sample "${inv.current.name}"? This cannot be undone.`)) return;
+  const expCount = inv.current.experiments?.length ?? 0;
+  const warning = expCount > 0
+    ? `\n\nThis will also permanently delete ${expCount} measurement${expCount > 1 ? "s" : ""} and all associated files.`
+    : "";
+  if (!confirm(`Delete sample "${inv.current.name}"?${warning}\n\nThis cannot be undone.`)) return;
   await api(`/api/samples/${inv.current.id}`, { method: "DELETE" });
   inv.current = null;
   await invLoadFilters();
@@ -532,4 +561,20 @@ function invToggleCustomOrientation() {
   const sel    = document.getElementById("f-orientation-select")?.value;
   const custom = document.getElementById("f-orientation-custom");
   if (custom) custom.style.display = sel === "custom" ? "" : "none";
+}
+
+function invToggleOtherSection(expId) {
+  const content = document.getElementById(`other-content-${expId}`);
+  const toggle  = document.getElementById(`other-toggle-${expId}`);
+  const isHidden = content.style.display === "none";
+  content.style.display = isHidden ? "" : "none";
+  toggle.textContent = isHidden ? "▼" : "▶";
+}
+
+function invToggleLogSection(expId) {
+  const content = document.getElementById(`log-content-${expId}`);
+  const toggle  = document.getElementById(`log-toggle-${expId}`);
+  const isHidden = content.style.display === "none";
+  content.style.display = isHidden ? "" : "none";
+  toggle.textContent = isHidden ? "▼" : "▶";
 }

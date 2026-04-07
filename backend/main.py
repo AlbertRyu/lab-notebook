@@ -4,6 +4,7 @@ import hmac
 import base64
 import hashlib
 import shutil
+import re
 import time
 from pathlib import Path
 from typing import Optional
@@ -49,6 +50,7 @@ import scanner
 app = FastAPI(title="Lab Notebook")
 
 DATA_DIR_PATH = Path(os.environ.get("DATA_DIR", "/data"))
+NOTES_DIR = DATA_DIR_PATH / "notes"
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
@@ -174,6 +176,10 @@ def auth_logout(response: Response):
 def on_startup():
     create_db()
     _seed_if_empty()
+    # Sync all existing notes to markdown files
+    from database import engine
+    with Session(engine) as session:
+        _sync_all_notes_from_db(session)
 
 
 def _seed_if_empty():
@@ -363,6 +369,14 @@ def delete_sample(
     sample = session.get(Sample, sample_id)
     if not sample:
         raise HTTPException(404, "Sample not found")
+    # Cascade: delete datafiles → experiments → sample_files → sample
+    experiments = session.exec(select(Experiment).where(Experiment.sample_id == sample_id)).all()
+    for exp in experiments:
+        for df in session.exec(select(DataFile).where(DataFile.experiment_id == exp.id)).all():
+            session.delete(df)
+        session.delete(exp)
+    for sf in session.exec(select(SampleFile).where(SampleFile.sample_id == sample_id)).all():
+        session.delete(sf)
     session.delete(sample)
     session.commit()
 
@@ -818,6 +832,68 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _slugify(title: str) -> str:
+    """Convert title to a safe filename slug."""
+    # Remove special characters, replace spaces with hyphens
+    slug = re.sub(r'[^\w\s-]', '', title).strip().lower()
+    slug = re.sub(r'[\s-]+', '-', slug)
+    # Limit length to avoid too long filenames
+    return slug[:50] or 'untitled'
+
+
+def _note_filename(note: Note) -> Path:
+    """Generate filename for a note: {id}-{slug}.md."""
+    slug = _slugify(note.title)
+    return NOTES_DIR / f"{note.id}-{slug}.md"
+
+
+def _write_note_file(note: Note) -> None:
+    """Write note to markdown file with YAML frontmatter."""
+    NOTES_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Format timestamps as ISO 8601
+    created_at = note.created_at.isoformat() if note.created_at else ""
+    updated_at = note.updated_at.isoformat() if note.updated_at else ""
+
+    # Build markdown content with YAML frontmatter
+    content = (
+        "---\n"
+        f"id: {note.id}\n"
+        f"title: {note.title}\n"
+        f"pinned: {str(note.pinned).lower()}\n"
+        f"created_at: {created_at}\n"
+        f"updated_at: {updated_at}\n"
+        "---\n\n"
+        f"{note.body}"
+    )
+
+    # Delete any existing files matching this note id to avoid stale files
+    # (if title changed, slug changes so filename changes)
+    pattern = f"{note.id}-*.md"
+    for old_file in NOTES_DIR.glob(pattern):
+        if old_file.exists():
+            old_file.unlink()
+
+    # Write new file
+    filename = _note_filename(note)
+    filename.write_text(content, encoding="utf-8")
+
+
+def _delete_note_file(note_id: int) -> None:
+    """Delete markdown file for a deleted note."""
+    pattern = f"{note_id}-*.md"
+    for old_file in NOTES_DIR.glob(pattern):
+        if old_file.exists():
+            old_file.unlink()
+
+
+def _sync_all_notes_from_db(session: Session) -> None:
+    """Sync all existing notes from database to markdown files on startup."""
+    notes = session.exec(select(Note)).all()
+    for note in notes:
+        _write_note_file(note)
+
+
 @app.get("/api/notes", response_model=list[NoteRead])
 def list_notes(
     q: Optional[str] = Query(None),
@@ -847,6 +923,7 @@ def create_note(
     session.add(note)
     session.commit()
     session.refresh(note)
+    _write_note_file(note)
     return note
 
 
@@ -878,6 +955,7 @@ def update_note(
     session.add(note)
     session.commit()
     session.refresh(note)
+    _write_note_file(note)
     return note
 
 
@@ -892,3 +970,4 @@ def delete_note(
         raise HTTPException(404, "Note not found")
     session.delete(note)
     session.commit()
+    _delete_note_file(note_id)

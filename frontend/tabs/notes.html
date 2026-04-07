@@ -27,8 +27,9 @@
         <div class="note-tab auth-write active" id="note-tab-edit"    onclick="noteSetTab('edit')">Edit</div>
         <div class="note-tab"                  id="note-tab-preview"  onclick="noteSetTab('preview')">Preview</div>
         <div style="flex:1"></div>
-        <button class="auth-write" id="note-pin-btn"    style="margin:4px 0;padding:3px 8px;"   onclick="noteTogglePin()">Pin</button>
-        <button class="danger auth-write" id="note-delete-btn" style="margin:4px 8px;padding:3px 8px;" onclick="deleteCurrentNote()">Delete</button>
+        <button id="note-download-btn" style="margin:4px 4px;padding:3px 8px;" onclick="downloadCurrentNote()">Download</button>
+        <button class="auth-write" id="note-pin-btn"    style="margin:4px 4px;padding:3px 8px;"   onclick="noteTogglePin()">Pin</button>
+        <button class="danger auth-write" id="note-delete-btn" style="margin:4px 4px 4px 8px;padding:3px 8px;" onclick="deleteCurrentNote()">Delete</button>
       </div>
       <div id="note-editor">
         <input id="note-title-input" type="text" placeholder="Note title…" oninput="noteMarkDirty()" />
