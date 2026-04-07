@@ -44,7 +44,7 @@
   font-family: inherit;
   resize: none;
   background: transparent;
-  min-height: 52px;
+  overflow: hidden;
   outline: none;
 }
 #ov-description:focus { border-color: var(--accent); background: var(--bg-panel); }

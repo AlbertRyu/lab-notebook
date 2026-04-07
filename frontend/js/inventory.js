@@ -112,7 +112,8 @@ function invRenderMeasurements(s) {
     mSection.innerHTML = '<div class="placeholder">No experiments recorded yet</div>';
     return;
   }
-  const typeLabel = { "ppms-vsm": "PPMS-VSM", "ppms-hc": "PPMS-HC", pxrd: "PXRD", sxrd: "SXRD", microscopy: "Microscopy" };
+  const typeLabel    = { "ppms-vsm": "PPMS-VSM", "ppms-hc": "PPMS-HC", pxrd: "PXRD", sxrd: "SXRD", microscopy: "Microscopy" };
+  const plottableTypes = new Set(["ppms-vsm", "ppms-hc", "pxrd", "sxrd"]);
   mSection.innerHTML = `
     <div class="sec-label" style="padding:0 0 8px;">Measurements</div>
     ${s.experiments.map((exp) => {
@@ -130,6 +131,7 @@ function invRenderMeasurements(s) {
           ${exp.type === "ppms-vsm" && exp.orientation ? `<span style="font-size:11px;color:var(--fg-muted);background:var(--bg-2,#eee);padding:1px 6px;border-radius:3px;">${esc(exp.orientation)}</span>` : ""}
           ${isPpms && exp.mass != null ? `<span style="font-size:11px;color:var(--fg-muted);background:var(--bg-2,#eee);padding:1px 6px;border-radius:3px;">${exp.mass} mg</span>` : ""}
           <div style="flex:1"></div>
+          ${plottableTypes.has(exp.type) ? `<button style="font-size:11px;padding:2px 8px;" onclick="invGoPlotting(${s.id},${exp.id},'${exp.type}')">Go Plotting</button>` : ""}
           <button class="danger auth-write" style="font-size:11px;padding:2px 8px;" onclick="invDeleteMeasurement(${exp.id})">Delete</button>
         </div>
 
@@ -569,6 +571,16 @@ function invToggleOtherSection(expId) {
   const isHidden = content.style.display === "none";
   content.style.display = isHidden ? "" : "none";
   toggle.textContent = isHidden ? "▼" : "▶";
+}
+
+async function invGoPlotting(sampleId, expId, expType) {
+  showPage("viz");
+  if (_vizInitPromise) await _vizInitPromise;
+  document.getElementById("viz-exp-type").value = expType;
+  document.getElementById("viz-sample-filter").value = String(sampleId);
+  await vizOnSampleChange();
+  document.getElementById("viz-meas-filter").value = String(expId);
+  vizRenderTable();
 }
 
 function invToggleLogSection(expId) {

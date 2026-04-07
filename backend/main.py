@@ -218,18 +218,22 @@ PPMS_CONFIG_PATH = DATA_DIR_PATH / "ppms_config.json"
 def get_ppms_config():
     if PPMS_CONFIG_PATH.exists():
         try:
-            return json.loads(PPMS_CONFIG_PATH.read_text(encoding="utf-8"))
+            data = json.loads(PPMS_CONFIG_PATH.read_text(encoding="utf-8"))
+            # Backwards compat: old format was a bare array
+            if isinstance(data, list):
+                return {"title": "", "description": "", "compounds": data}
+            return data
         except Exception:
             pass
-    return []
+    return {"title": "", "description": "", "compounds": []}
 
 
 @app.post("/api/ppms-config")
 async def save_ppms_config(request: Request):
     require_write_auth(request)
     data = await request.json()
-    if not isinstance(data, list):
-        raise HTTPException(400, "Expected a JSON array")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Expected a JSON object")
     PPMS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     PPMS_CONFIG_PATH.write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -759,6 +763,8 @@ def list_files(
                 file_type=f.file_type,
                 experiment_id=exp.id,
                 exp_type=exp.type,
+                exp_date=str(exp.exp_date) if exp.exp_date else None,
+                exp_orientation=exp.orientation,
                 sample_id=s.id,
                 sample_name=s.name,
                 auto_mode=auto_mode,

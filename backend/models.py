@@ -157,6 +157,8 @@ class FileWithContext(SQLModel):
     file_type: str
     experiment_id: int
     exp_type: str
+    exp_date: Optional[str] = None
+    exp_orientation: Optional[str] = None
     sample_id: int
     sample_name: str
     auto_mode: Optional[str] = None

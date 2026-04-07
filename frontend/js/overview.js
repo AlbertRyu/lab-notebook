@@ -14,22 +14,18 @@ const OV_TYPE_COLORS = {
 
 // ── Editable fields persistence ──────────────────────────────────────────
 
-function ovSave() {
-  const data = {};
-  ["ov-title","ov-description"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) data[id] = el.value;
-  });
-  try { localStorage.setItem(OV_KEY, JSON.stringify(data)); } catch (_) {}
+function ovDescAutoResize() {
+  const el = document.getElementById("ov-description");
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
 }
 
-function ovLoadEditable() {
-  let data = {};
-  try { data = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
-  ["ov-title","ov-description"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el && data[id] !== undefined) el.value = data[id];
-  });
+let _ovSaveTimer = null;
+function ovSave() {
+  ovDescAutoResize();
+  clearTimeout(_ovSaveTimer);
+  _ovSaveTimer = setTimeout(ovSaveConfig, 600);
 }
 
 // ── Goals / Milestones ───────────────────────────────────────────────────
@@ -192,12 +188,20 @@ function ovDrawCharts(byType, byCpd) {
 
 // ── Entry point (called by main.js after HTML injection) ─────────────────
 
-function ovShow() {
-  ovLoadEditable();
-  let data = {};
-  try { data = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
-  ovRenderGoals(data["ov-goals"] || ovGoalsBuild());
-  _ovPpmsCompounds = null;  // force fresh fetch from server on each tab activation
+async function ovShow() {
+  _ovPpmsCompounds = null; // force fresh fetch from server on each tab activation
+  const config = await ovLoadConfig();
+  const titleEl = document.getElementById("ov-title");
+  const descEl  = document.getElementById("ov-description");
+  if (titleEl) titleEl.value = config.title       || "";
+  if (descEl)  descEl.value  = config.description || "";
+  ovDescAutoResize();
+  _ovPpmsCompounds = config.compounds;
+
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
+  ovRenderGoals(stored["ov-goals"] || ovGoalsBuild());
+
   ovPpmsRender();
   ovLoadLive();
 }
@@ -255,37 +259,48 @@ const OV_PPMS_DEFAULT = [
     vsm: [], hc: [], phase_diagram: [] },
 ];
 
-async function ovPpmsLoadFromServer() {
+async function ovLoadConfig() {
   try {
     const res = await fetch("/api/ppms-config");
     if (!res.ok) throw new Error();
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) return data;
+    const compounds = Array.isArray(data.compounds) && data.compounds.length > 0
+      ? data.compounds
+      : OV_PPMS_DEFAULT.map(c => ({ ...c, vsm: [...c.vsm], hc: [...c.hc], phase_diagram: [...c.phase_diagram] }));
+    return { title: data.title || "", description: data.description || "", compounds };
   } catch (_) {}
-  // Fall back to built-in defaults (first run or server error)
-  return OV_PPMS_DEFAULT.map(c => ({ ...c,
-    vsm: [...c.vsm], hc: [...c.hc], phase_diagram: [...c.phase_diagram] }));
+  return { title: "", description: "", compounds: OV_PPMS_DEFAULT.map(c => ({ ...c, vsm: [...c.vsm], hc: [...c.hc], phase_diagram: [...c.phase_diagram] })) };
 }
 
-async function ovPpmsSaveToServer() {
+async function ovSaveConfig() {
+  const titleEl = document.getElementById("ov-title");
+  const descEl  = document.getElementById("ov-description");
   try {
     const res = await fetch("/api/ppms-config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(_ovPpmsCompounds),
+      body: JSON.stringify({
+        title:       titleEl?.value ?? "",
+        description: descEl?.value  ?? "",
+        compounds:   _ovPpmsCompounds ?? [],
+      }),
     });
     if (!res.ok) throw new Error(await res.text());
   } catch (e) {
-    console.error("Failed to save PPMS config:", e);
+    console.error("Failed to save config:", e);
     alert("Save failed — check the browser console for details.");
   }
 }
+
+// Keep old name as alias so call-sites in edit/delete/add still work
+const ovPpmsSaveToServer = ovSaveConfig;
 
 // ── View mode ─────────────────────────────────────────────────────────────
 
 async function ovPpmsRender() {
   if (_ovPpmsCompounds === null) {
-    _ovPpmsCompounds = await ovPpmsLoadFromServer();
+    const config = await ovLoadConfig();
+    _ovPpmsCompounds = config.compounds;
   }
   const container = document.getElementById("ov-ppms");
   if (!container) return;
@@ -475,7 +490,7 @@ async function ovPpmsDeleteCompound(idx) {
 }
 
 async function ovPpmsAddCompound() {
-  if (!_ovPpmsCompounds) _ovPpmsCompounds = await ovPpmsLoadFromServer();
+  if (!_ovPpmsCompounds) _ovPpmsCompounds = (await ovLoadConfig()).compounds;
   _ovPpmsCompounds.push({ id: "cpd-" + Date.now(), name: "New Compound", description: "",
     vsm: [], hc: [], phase_diagram: [] });
   await ovPpmsSaveToServer();
