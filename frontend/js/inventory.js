@@ -32,6 +32,8 @@ async function invLoadSamples() {
   const compound = document.getElementById("inv-compound").value;
   const batch    = document.getElementById("inv-batch").value;
   const box      = document.getElementById("inv-box").value;
+  // Inventory only shows samples that have at least one experiment
+  p.set("has_experiments", "with");
   if (q)        p.set("q",        q);
   if (compound) p.set("compound", compound);
   if (batch)    p.set("batch",    batch);

@@ -136,9 +136,10 @@
 /* Stats cards */
 #ov-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   margin-bottom: 28px;
+  min-width: 0;
 }
 .ov-stat-card {
   background: var(--bg-panel);
@@ -168,9 +169,10 @@
 /* Charts */
 #ov-charts {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 10px;
   margin-bottom: 28px;
+  min-width: 0;
 }
 .ov-chart-card {
   background: var(--bg-panel);
@@ -179,13 +181,18 @@
   padding: 14px;
 }
 .ov-chart-title { font-size: 10.5px; font-weight: 700; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-.ov-chart-body { height: 170px; }
+.ov-chart-body {
+  height: 170px;
+  width: 100%;
+  min-width: 0;
+}
 
 /* Sample table */
 .ov-table-wrap {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin-bottom: 28px;
 }
 .ov-db-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -272,7 +279,8 @@
   overflow: hidden;
   background: var(--bg-panel);
 }
-.ov-graph-card img { width: 100%; height: auto; display: block; }
+.ov-graph-card img { width: 100%; height: auto; display: block; cursor: pointer; transition: opacity 0.2s; }
+.ov-graph-card img:hover { opacity: 0.92; }
 .ov-graph-card--wide { grid-column: 1 / -1; }
 
 /* Compound card (view mode) */

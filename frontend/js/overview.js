@@ -158,32 +158,42 @@ function ovDrawCharts(byType, byCpd) {
     showlegend: false,
   };
 
-  // Chart 1 — Experiments by type
-  const typeKeys   = Object.keys(byType);
-  const typeVals   = typeKeys.map((k) => byType[k]);
-  const typeColors = typeKeys.map((k) => OV_TYPE_COLORS[k] || "#6b7280");
-  if (typeKeys.length > 0) {
-    Plotly.newPlot("ov-chart-exps",
-      [{ type: "bar", x: typeKeys, y: typeVals, marker: { color: typeColors }, hovertemplate: "%{x}: %{y}<extra></extra>" }],
-      { ...baseLayout, xaxis: { showgrid: false, tickfont: { size: 9 } }, yaxis: { showgrid: true, gridcolor: gridColor, tickfont: { size: 9 }, dtick: 1 } },
-      { responsive: true, displayModeBar: false });
-  } else {
-    document.getElementById("ov-chart-exps").innerHTML =
-      '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:12px">No experiment data</div>';
-  }
+  // Wait for layout to complete before drawing charts
+  // This ensures Plotly gets correct container dimensions on first load
+  requestAnimationFrame(() => {
+    // Chart 1 — Experiments by type
+    const typeKeys   = Object.keys(byType);
+    const typeVals   = typeKeys.map((k) => byType[k]);
+    const typeColors = typeKeys.map((k) => OV_TYPE_COLORS[k] || "#6b7280");
+    if (typeKeys.length > 0) {
+      Plotly.newPlot("ov-chart-exps",
+        [{ type: "bar", x: typeKeys, y: typeVals, marker: { color: typeColors }, hovertemplate: "%{x}: %{y}<extra></extra>" }],
+        { ...baseLayout, xaxis: { showgrid: false, tickfont: { size: 9 } }, yaxis: { showgrid: true, gridcolor: gridColor, tickfont: { size: 9 }, nticks: 8 } },
+        { responsive: true, displayModeBar: false });
+    } else {
+      document.getElementById("ov-chart-exps").innerHTML =
+        '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:12px">No experiment data</div>';
+    }
 
-  // Chart 2 — Samples by compound (horizontal)
-  const cpdKeys = Object.keys(byCpd);
-  const cpdVals = cpdKeys.map((k) => byCpd[k]);
-  if (cpdKeys.length > 0) {
-    Plotly.newPlot("ov-chart-compounds",
-      [{ type: "bar", orientation: "h", x: cpdVals, y: cpdKeys, marker: { color: "#2563eb" }, hovertemplate: "%{y}: %{x}<extra></extra>" }],
-      { ...baseLayout, margin: { t: 8, b: 24, l: 90, r: 8 }, xaxis: { showgrid: true, gridcolor: gridColor, tickfont: { size: 9 }, dtick: 1 }, yaxis: { showgrid: false, tickfont: { size: 9 }, automargin: true } },
-      { responsive: true, displayModeBar: false });
-  } else {
-    document.getElementById("ov-chart-compounds").innerHTML =
-      '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:12px">No sample data</div>';
-  }
+    // Chart 2 — Samples by compound (horizontal)
+    const cpdKeys = Object.keys(byCpd);
+    const cpdVals = cpdKeys.map((k) => byCpd[k]);
+    if (cpdKeys.length > 0) {
+      Plotly.newPlot("ov-chart-compounds",
+        [{ type: "bar", orientation: "h", x: cpdVals, y: cpdKeys, marker: { color: "#2563eb" }, hovertemplate: "%{y}: %{x}<extra></extra>" }],
+        { ...baseLayout, margin: { t: 8, b: 24, l: 90, r: 8 }, xaxis: { showgrid: true, gridcolor: gridColor, tickfont: { size: 9 }, nticks: 8 }, yaxis: { showgrid: false, tickfont: { size: 9 }, automargin: true } },
+        { responsive: true, displayModeBar: false });
+    } else {
+      document.getElementById("ov-chart-compounds").innerHTML =
+        '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:12px">No sample data</div>';
+    }
+
+    // Trigger a resize after a short delay to guarantee responsive sizing
+    setTimeout(() => {
+      Plotly.Plots.resize("ov-chart-exps");
+      Plotly.Plots.resize("ov-chart-compounds");
+    }, 100);
+  });
 }
 
 // ── Entry point (called by main.js after HTML injection) ─────────────────
@@ -306,6 +316,14 @@ async function ovPpmsRender() {
   if (!container) return;
   container.innerHTML = "";
   _ovPpmsCompounds.forEach((c, idx) => container.appendChild(ovPpmsMakeCard(c, idx)));
+
+  // Add click handler for image enlargement — uses delegated events so it works for all images
+  container.addEventListener('click', (e) => {
+    const img = e.target.closest('.ov-graph-card img');
+    if (img && openLightbox) {
+      openLightbox(img.src, img.alt);
+    }
+  });
 }
 
 function ovPpmsMakeCard(c, idx) {

@@ -168,16 +168,21 @@ def extract_header_meta(path: str) -> dict:
     return meta
 
 
-def to_traces(df: dict, mode: str, label: str) -> list[dict]:
+def to_traces(df: dict, mode: str, label: str, mass: Optional[float] = None) -> list[dict]:
     T = df.get("Temperature (K)", [])
     H = df.get("Magnetic Field (Oe)", [])
     M = df.get("Moment (emu)", [])
 
     x, y = [], []
     src = T if mode == "MT" else H
+    # Only normalize if mass is present and mass > 0 (avoid division by zero)
+    normalize = mass is not None and mass > 0
     for i in range(min(len(src), len(M))):
         if src[i] == src[i] and M[i] == M[i]:  # isfinite check
             x.append(src[i])
-            y.append(M[i])
+            if normalize:
+                y.append(M[i] / mass)
+            else:
+                y.append(M[i])
 
     return [{"x": x, "y": y, "mode": "lines", "name": label, "type": "scatter"}]

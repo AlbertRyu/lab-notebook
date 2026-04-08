@@ -46,6 +46,7 @@ function applyAuthUi() {
   [
     "inv-add-sample-btn", "inv-scan-btn", "inv-import-btn",
     "detail-add-exp-btn", "detail-edit-sample-btn", "detail-delete-sample-btn",
+    "prep-add-sample-btn", "prep-detail-edit-btn", "prep-detail-delete-btn",
     "notes-add-btn", "note-save-btn", "note-pin-btn", "note-delete-btn",
     "note-title-input", "note-body",
   ].forEach((id) => {
@@ -120,6 +121,7 @@ function showPage(name) {
   document.getElementById("page-" + name).classList.add("active");
   document.getElementById("nav-" + name).classList.add("active");
   if (name !== "graph") graphStopAnimation();
+  if (name === "preparations" && !_preparationsLoaded) preparationsInit();
   if (name === "viz" && !_vizLoaded) vizInit();
   if (name === "graph") {
     if (!_graphLoaded) graphInit();
@@ -250,7 +252,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "inventory", "viz", "notes", "graph"];
+  const tabs = ["overview", "inventory", "preparations", "viz", "notes", "graph"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))

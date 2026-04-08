@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/static/css/base.css" />
     <link rel="stylesheet" href="/static/css/overview.css" />
     <link rel="stylesheet" href="/static/css/inventory.css" />
+    <link rel="stylesheet" href="/static/css/preparations.css" />
     <link rel="stylesheet" href="/static/css/viz.css" />
     <link rel="stylesheet" href="/static/css/notes.css" />
     <link rel="stylesheet" href="/static/css/graph.css" />
@@ -27,6 +28,7 @@
         <div class="nav-logo">🧪</div>
         <button class="nav-btn active" id="nav-overview"   title="Overview"         onclick="showPage('overview')">🏠</button>
         <button class="nav-btn"        id="nav-inventory"  title="Sample Inventory"  onclick="showPage('inventory')">📋</button>
+        <button class="nav-btn"        id="nav-preparations" title="Preparations (Waiting)" onclick="showPage('preparations')">🧭</button>
         <button class="nav-btn"        id="nav-viz"        title="Data Visualization" onclick="showPage('viz')">📈</button>
         <button class="nav-btn"        id="nav-notes"      title="Notes"             onclick="showPage('notes')">📝</button>
         <button class="nav-btn"        id="nav-graph"      title="Entity Graph"      onclick="showPage('graph')">🕸️</button>
@@ -66,6 +68,7 @@
     <!-- App scripts (order matters — main.js references functions from the others) -->
     <script src="/static/js/overview.js"></script>
     <script src="/static/js/inventory.js"></script>
+    <script src="/static/js/preparations.js"></script>
     <script src="/static/js/viz.js"></script>
     <script src="/static/js/notes.js"></script>
     <script src="/static/js/graph.js"></script>

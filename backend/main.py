@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlmodel import Session, select
+from sqlalchemy import text
 
 from database import create_db, get_session
 from datetime import datetime, timezone
@@ -172,9 +173,29 @@ def auth_logout(response: Response):
     return {"authenticated": False}
 
 
+def _migrate_notes_table() -> None:
+    """Add new columns to the note table if they don't exist yet."""
+    from database import engine
+    new_cols = {
+        "note_type": "VARCHAR DEFAULT 'discussion'",
+        "tags": "VARCHAR",
+        "status": "VARCHAR DEFAULT 'draft'",
+        "linked_sample_ids": "VARCHAR",
+        "log_date": "VARCHAR",
+        "next_steps": "VARCHAR",
+    }
+    with engine.connect() as conn:
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(note)"))}
+        for col, definition in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE note ADD COLUMN {col} {definition}"))
+        conn.commit()
+
+
 @app.on_event("startup")
 def on_startup():
     create_db()
+    _migrate_notes_table()
     _seed_if_empty()
     # Sync all existing notes to markdown files
     from database import engine
@@ -261,6 +282,7 @@ def list_samples(
     batch: Optional[str] = Query(None),
     box: Optional[str] = Query(None),
     q: Optional[str] = Query(None, description="Search name or compound"),
+    has_experiments: Optional[str] = Query(None, description="Filter: with | without"),
     session: Session = Depends(get_session),
 ):
     stmt = select(Sample)
@@ -273,6 +295,10 @@ def list_samples(
     if q:
         like = f"%{q}%"
         stmt = stmt.where(Sample.name.like(like) | Sample.compound.like(like))
+    if has_experiments == "without":
+        stmt = stmt.where(~Sample.experiments.any())
+    elif has_experiments == "with":
+        stmt = stmt.where(Sample.experiments.any())
     samples = session.exec(stmt.order_by(Sample.name)).all()
     return samples
 
@@ -627,10 +653,13 @@ def experiment_data(
             if df is None:
                 continue
             m = mode or detect_mode(df)
-            t = ppms_traces(df, m, f.filename)
+            t = ppms_traces(df, m, f.filename, exp.mass)
             traces.extend(t)
             xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
-            yaxis_title = "Moment (emu)"
+            if exp.mass is not None and exp.mass > 0:
+                yaxis_title = "Moment (emu/mg)"
+            else:
+                yaxis_title = "Moment (emu)"
 
         elif exp.type in {"pxrd", "sxrd"}:
             from parsers.pxrd import parse_pxrd, to_traces as pxrd_traces
@@ -788,6 +817,33 @@ def plot_files(
     xaxis_title = ""
     yaxis_title = ""
 
+    # For PPMS files: check mass consistency
+    ppms_files = []
+    for fid in file_ids:
+        f = session.get(DataFile, fid)
+        if not f:
+            continue
+        exp = session.get(Experiment, f.experiment_id)
+        if exp.type in {"ppms-vsm", "ppms-hc"}:
+            has_valid_mass = exp.mass is not None and exp.mass > 0
+            ppms_files.append((f, exp, has_valid_mass))
+
+    # Validate mass consistency for PPMS files
+    if ppms_files:
+        # All have valid mass or all don't?
+        all_have = all(h for _, _, h in ppms_files)
+        all_missing = not any(h for _, _, h in ppms_files)
+
+        if not all_have and not all_missing:
+            # Mixed case - collect missing and return error
+            missing = [f"{exp.name} (ID:{exp.id})" for _, exp, h in ppms_files if not h]
+            raise HTTPException(
+                400,
+                f"Cannot plot mixed mass states: some measurements are missing valid sample mass. "
+                f"Please add mass to: {', '.join(missing)}. "
+                f"Plotting is only allowed when all files have mass or none do."
+            )
+
     for fid in file_ids:
         f = session.get(DataFile, fid)
         if not f:
@@ -802,9 +858,12 @@ def plot_files(
             if df is None:
                 continue
             m = mode or detect_mode(df)
-            traces.extend(ppms_traces(df, m, f.filename))
+            traces.extend(ppms_traces(df, m, f.filename, exp.mass))
             xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
-            yaxis_title = "Moment (emu)"
+            if exp.mass is not None and exp.mass > 0:
+                yaxis_title = "Moment (emu/mg)"
+            else:
+                yaxis_title = "Moment (emu)"
 
         elif exp.type in {"pxrd", "sxrd"}:
             from parsers.pxrd import parse_pxrd, to_traces as pxrd_traces
@@ -857,30 +916,35 @@ def _write_note_file(note: Note) -> None:
     """Write note to markdown file with YAML frontmatter."""
     NOTES_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Format timestamps as ISO 8601
     created_at = note.created_at.isoformat() if note.created_at else ""
     updated_at = note.updated_at.isoformat() if note.updated_at else ""
+    note_type = note.note_type or "discussion"
 
-    # Build markdown content with YAML frontmatter
     content = (
         "---\n"
         f"id: {note.id}\n"
         f"title: {note.title}\n"
+        f"note_type: {note_type}\n"
         f"pinned: {str(note.pinned).lower()}\n"
         f"created_at: {created_at}\n"
         f"updated_at: {updated_at}\n"
-        "---\n\n"
-        f"{note.body}"
     )
+    if note_type == "discussion":
+        content += f"tags: {note.tags or '[]'}\n"
+        content += f"status: {note.status or 'draft'}\n"
+    elif note_type == "daily_log":
+        content += f"log_date: {note.log_date or ''}\n"
+        if note.next_steps:
+            content += f"next_steps: {json.dumps(note.next_steps)}\n"
+    content += "---\n\n"
+    content += note.body or ""
 
     # Delete any existing files matching this note id to avoid stale files
-    # (if title changed, slug changes so filename changes)
     pattern = f"{note.id}-*.md"
     for old_file in NOTES_DIR.glob(pattern):
         if old_file.exists():
             old_file.unlink()
 
-    # Write new file
     filename = _note_filename(note)
     filename.write_text(content, encoding="utf-8")
 
@@ -903,13 +967,25 @@ def _sync_all_notes_from_db(session: Session) -> None:
 @app.get("/api/notes", response_model=list[NoteRead])
 def list_notes(
     q: Optional[str] = Query(None),
+    note_type: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
     session: Session = Depends(get_session),
 ):
     stmt = select(Note)
     if q:
         like = f"%{q}%"
         stmt = stmt.where(Note.title.like(like) | Note.body.like(like))
-    return session.exec(stmt.order_by(Note.pinned.desc(), Note.updated_at.desc())).all()
+    if note_type:
+        stmt = stmt.where(Note.note_type == note_type)
+    if tag:
+        stmt = stmt.where(Note.tags.contains(f'"{tag}"'))
+    # For daily_log: sort pinned first, then log_date descending (most recent first)
+    # For discussion: sort pinned first, then updated_at descending
+    if note_type == 'daily_log':
+        stmt = stmt.order_by(Note.pinned.desc(), Note.log_date.desc())
+    else:
+        stmt = stmt.order_by(Note.pinned.desc(), Note.updated_at.desc())
+    return session.exec(stmt).all()
 
 
 @app.post("/api/notes", response_model=NoteRead, status_code=201)
@@ -923,6 +999,12 @@ def create_note(
         title=data.title,
         body=data.body,
         pinned=data.pinned,
+        note_type=data.note_type,
+        tags=data.tags,
+        status=data.status,
+        linked_sample_ids=data.linked_sample_ids,
+        log_date=data.log_date,
+        next_steps=data.next_steps,
         created_at=now,
         updated_at=now,
     )
@@ -957,11 +1039,112 @@ def update_note(
         note.body = data.body
     if data.pinned is not None:
         note.pinned = data.pinned
+    if data.note_type is not None:
+        note.note_type = data.note_type
+    if data.tags is not None:
+        note.tags = data.tags
+    if data.status is not None:
+        note.status = data.status
+    if data.linked_sample_ids is not None:
+        note.linked_sample_ids = data.linked_sample_ids
+    if data.log_date is not None:
+        note.log_date = data.log_date
+    if data.next_steps is not None:
+        note.next_steps = data.next_steps
     note.updated_at = _now()
     session.add(note)
     session.commit()
     session.refresh(note)
     _write_note_file(note)
+    return note
+
+
+def _parse_yaml_frontmatter(content: str) -> tuple[dict, str]:
+    """Parse YAML frontmatter from markdown content. Returns (frontmatter_dict, body_content)."""
+    if not content.startswith('---\n'):
+        return {}, content
+
+    # Find the closing ---
+    end_idx = content.find('\n---\n', 4)
+    if end_idx == -1:
+        return {}, content
+
+    try:
+        import yaml
+        frontmatter = yaml.safe_load(content[4:end_idx]) or {}
+        body = content[end_idx + 5:].lstrip()
+        return frontmatter, body
+    except Exception:
+        # If YAML parsing fails, treat everything as body
+        return {}, content
+
+
+@app.post("/api/notes/upload", response_model=NoteRead, status_code=201)
+async def upload_note(
+    file: UploadFile = FastAPIFile(...),
+    _: None = Depends(require_write_auth),
+    session: Session = Depends(get_session),
+):
+    """Upload a Markdown file as a new note. Supports YAML frontmatter."""
+
+    # Validate file extension
+    if not file.filename or not file.filename.lower().endswith('.md'):
+        raise HTTPException(400, "Only Markdown files (.md) are accepted")
+
+    # Read file content
+    content_bytes = await file.read()
+    try:
+        content = content_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(400, "File must be UTF-8 encoded text")
+
+    # Parse YAML frontmatter
+    frontmatter, body = _parse_yaml_frontmatter(content)
+
+    # Extract metadata from frontmatter or use defaults
+    title = frontmatter.get('title', file.filename[:-3] if file.filename else 'Untitled')
+    note_type = frontmatter.get('note_type', 'discussion')
+    pinned = bool(frontmatter.get('pinned', False))
+    status = frontmatter.get('status', 'draft')
+    tags = frontmatter.get('tags')
+    log_date = frontmatter.get('log_date')
+    next_steps = frontmatter.get('next_steps')
+
+    # Validate note_type
+    if note_type not in ['discussion', 'daily_log']:
+        note_type = 'discussion'
+
+    # Handle tags - if it's a list, convert to JSON string
+    if tags is not None and isinstance(tags, list):
+        tags = json.dumps(tags)
+    elif tags is not None and not isinstance(tags, str):
+        tags = None
+
+    # Handle next_steps - if it's a multi-line string in YAML, it will already be a string
+    if next_steps is not None and not isinstance(next_steps, str):
+        next_steps = str(next_steps) if next_steps else None
+
+    # Create note
+    now = _now()
+    note = Note(
+        title=title,
+        body=body,
+        pinned=pinned,
+        note_type=note_type,
+        tags=tags,
+        status=status,
+        log_date=log_date,
+        next_steps=next_steps,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(note)
+    session.commit()
+    session.refresh(note)
+
+    # Write the markdown file (using existing sync logic)
+    _write_note_file(note)
+
     return note
 
 

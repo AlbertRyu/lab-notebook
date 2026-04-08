@@ -1,0 +1,52 @@
+<div class="page" id="page-preparations">
+  <!-- Left: sample list -->
+  <div id="prep-left">
+    <div id="prep-search">
+      <input id="prep-search-input" type="search" placeholder="Search samples…" oninput="prepApplyFilters()" />
+    </div>
+    <div id="prep-filters">
+      <select id="prep-compound" onchange="prepApplyFilters()"><option value="">All compounds</option></select>
+      <select id="prep-batch"    onchange="prepApplyFilters()"><option value="">All batches</option></select>
+      <select id="prep-box"      onchange="prepApplyFilters()"><option value="">All boxes</option></select>
+    </div>
+    <div id="prep-list"></div>
+    <div id="prep-footer">
+      <span id="prep-count">0 samples waiting</span>
+    </div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" data-target="prep-left"></div>
+
+  <!-- Right: detail -->
+  <div id="prep-right">
+    <div id="prep-header-toolbar" style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--bg-header);border-bottom:1px solid var(--border-strong);flex-shrink:0;">
+      <span style="font-weight:700;font-size:13px">Preparations (Waiting for Measurement)</span>
+      <div style="flex:1"></div>
+      <button class="primary auth-write" id="prep-add-sample-btn" onclick="openAddSample()">+ Sample</button>
+    </div>
+
+    <div id="prep-detail-placeholder" class="placeholder" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="icon">🧪</div>
+      <div>Select a sample to view details</div>
+    </div>
+
+    <div id="prep-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div id="prep-detail-scroll" style="flex:1;overflow-y:auto;">
+        <div id="prep-detail-header">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            <h2 id="prep-detail-name"></h2>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="auth-write" id="prep-detail-edit-btn" onclick="openEditSample()">Edit</button>
+              <button class="auth-write danger" id="prep-detail-delete-btn" onclick="deleteSample()">Delete</button>
+            </div>
+          </div>
+          <div class="meta-grid" id="prep-detail-meta"></div>
+          <div id="prep-detail-notes" style="font-size:12px;color:var(--fg-dim);margin-top:6px;font-style:italic;"></div>
+          <!-- Sample-level photos -->
+          <div id="prep-sample-photos" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

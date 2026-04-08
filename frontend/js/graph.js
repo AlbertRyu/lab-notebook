@@ -445,7 +445,7 @@ function graphWheel(event) {
   const mx = event.clientX - rect.left, my = event.clientY - rect.top;
   const before = graphScreenToWorld(mx, my);
   const factor = event.deltaY > 0 ? 0.92 : 1.08;
-  graph.view.scale = Math.min(2.6, Math.max(0.35, graph.view.scale * factor));
+  graph.view.scale = Math.min(2.6, Math.max(0.25, graph.view.scale * factor));
   graph.view.x = mx - graph.width  / 2 - before.x * graph.view.scale;
   graph.view.y = my - graph.height / 2 - before.y * graph.view.scale;
   graphDraw();
@@ -497,7 +497,7 @@ async function graphRefresh() {
   graph.nodes = []; graph.edges = [];
   graph.nodeIndex = new Map();
   graph.hoverKey = null; graph.dragKey = null; graph.dragMode = null;
-  graph.view = { x: 0, y: 0, scale: 1 };
+  graph.view = { x: 0, y: 0, scale: 0.25 };
 
   const oldCanvas = document.querySelector("#graph-canvas canvas");
   if (oldCanvas) oldCanvas.remove();

@@ -23,7 +23,7 @@
 .note-item .n-preview { font-size: 11px; color: var(--fg-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #notes-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#note-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px 20px; gap: 10px; }
+#note-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px 20px; gap: 10px; min-height: 0; }
 #note-title-input {
   font-size: 18px;
   font-weight: 700;
@@ -36,7 +36,7 @@
   color: var(--fg);
 }
 #note-title-input:focus { border-bottom-color: var(--accent); outline: none; }
-#note-body-wrap { flex: 1; position: relative; display: flex; flex-direction: column; }
+#note-body-wrap { flex: 1; position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 #note-body {
   flex: 1;
   resize: none;
@@ -83,7 +83,7 @@
 .mention-chip:hover { text-decoration: underline; }
 
 /* markdown rendered view */
-#note-render { flex: 1; overflow-y: auto; padding: 10px 14px; line-height: 1.75; font-size: 13.5px; display: none; }
+#note-render { flex: 1; overflow-y: auto; padding: 10px 14px; line-height: 1.75; font-size: 13.5px; display: none; min-height: 0; }
 #note-render h1, #note-render h2, #note-render h3, #note-render h4 { margin: 1em 0 0.4em; font-weight: 700; line-height: 1.3; color: var(--fg); }
 #note-render h1 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 0.25em; }
 #note-render h2 { font-size: 1.25em; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; }
@@ -101,7 +101,52 @@
 #note-render th, #note-render td { border: 1px solid var(--border-strong); padding: 5px 10px; text-align: left; }
 #note-render th { background: var(--bg-header); font-weight: 600; }
 #note-render hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+#note-render img { max-width: 100%; height: auto; display: block; margin: 0.75em 0; }
 
 #note-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .note-tab { padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; color: var(--fg-dim); }
 .note-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Type filter */
+#notes-type-filter { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.notes-type-pill { padding: 4px 12px; font-size: 11px; font-weight: 600; cursor: pointer; color: var(--fg-dim); border-bottom: 2px solid transparent; }
+.notes-type-pill.active { color: var(--accent); border-bottom-color: var(--accent); }
+.notes-type-pill:hover { color: var(--fg); }
+
+/* Tag filter bar */
+#notes-tag-filter { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.notes-tag-pill { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; cursor: pointer; background: var(--bg); border: 1px solid var(--border-strong); color: var(--fg-dim); white-space: nowrap; }
+.notes-tag-pill:hover { color: var(--fg); border-color: var(--accent); }
+.notes-tag-pill.active { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); border-color: var(--accent); }
+
+/* Type badge in list */
+.n-type-badge { font-size: 9px; font-weight: 700; border-radius: 999px; padding: 1px 5px; flex-shrink: 0; }
+.n-type-badge.disc { color: var(--accent); border: 1px solid var(--accent); }
+.n-type-badge.log { color: #22c55e; border: 1px solid #22c55e; }
+
+/* Note meta panels */
+.note-meta-panel { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.note-meta-row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.note-meta-field { display: flex; flex-direction: column; gap: 3px; }
+.note-meta-label { font-size: 10px; font-weight: 700; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.note-meta-field input[type="text"],
+.note-meta-field input[type="date"],
+.note-meta-field select { font-size: 12px; padding: 3px 6px; min-width: 90px; }
+.note-next-steps-ta { font-size: 12px; padding: 4px 6px; resize: vertical; min-width: 120px; line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--fg); }
+.note-next-steps-ta:focus { border-color: var(--accent); outline: none; }
+.note-meta-field--full { flex: 1; min-width: 200px; }
+
+/* Tag chips in note list */
+.n-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.n-tag-chip { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); cursor: pointer; white-space: nowrap; }
+.n-tag-chip:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.n-tag-chip.active { background: color-mix(in srgb, var(--accent) 25%, transparent); border-color: var(--accent); }
+.n-tag-more { font-size: 10px; color: var(--fg-muted); padding: 1px 4px; }
+
+/* Chip-based tag editor field */
+.tag-chips-field { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); min-height: 28px; cursor: text; }
+.tag-chips-field:focus-within { border-color: var(--accent); }
+.edit-tag-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); white-space: nowrap; }
+.tag-chip-rm { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; opacity: 0.7; }
+.tag-chip-rm:hover { opacity: 1; }
+#note-tags-text { border: none; outline: none; background: transparent; font-size: 12px; color: var(--fg); flex: 1; min-width: 80px; padding: 0; }

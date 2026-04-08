@@ -8,7 +8,10 @@ const notes = {
   dirty: false,
   mentionTargets: [],
   experimentToSample: {},
+  typeFilter: 'all',
+  tagFilter: null,
 };
+let _editTags = [];
 let _notesLoaded  = false;
 let _noteSaveTimer = null;
 
@@ -59,9 +62,53 @@ async function notesBuildMentionTargets() {
 }
 
 async function notesLoadList(q = "") {
-  const p = q ? "?q=" + encodeURIComponent(q) : "";
-  notes.list = await api("/api/notes" + p).catch(() => []);
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (notes.typeFilter && notes.typeFilter !== 'all') params.set("note_type", notes.typeFilter);
+  if (notes.tagFilter) params.set("tag", notes.tagFilter);
+  const qs = params.toString() ? "?" + params.toString() : "";
+  notes.list = await api("/api/notes" + qs).catch(() => []);
   notesRenderList();
+  notesRenderTagFilter();
+}
+
+function notesSetTypeFilter(type) {
+  notes.typeFilter = type;
+  document.querySelectorAll('.notes-type-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.type === type);
+  });
+  notesLoadList(document.getElementById("notes-search-input").value.trim());
+}
+
+function notesRenderTagFilter() {
+  // Collect all unique tags across the full unfiltered list.
+  // We re-fetch without the tag filter to build the tag cloud.
+  const el = document.getElementById("notes-tag-filter");
+  if (!el) return;
+  const params = new URLSearchParams();
+  if (notes.typeFilter && notes.typeFilter !== 'all') params.set("note_type", notes.typeFilter);
+  const q = document.getElementById("notes-search-input").value.trim();
+  if (q) params.set("q", q);
+  const qs = params.toString() ? "?" + params.toString() : "";
+  api("/api/notes" + qs).then(allNotes => {
+    const tagSet = new Set();
+    allNotes.forEach(n => {
+      try { (JSON.parse(n.tags || "[]")).forEach(t => tagSet.add(t)); } catch {}
+    });
+    const tags = Array.from(tagSet).sort();
+    if (!tags.length) { el.style.display = "none"; return; }
+    el.style.display = "flex";
+    el.innerHTML =
+      `<div class="notes-tag-pill${!notes.tagFilter ? " active" : ""}" onclick="notesSetTagFilter(null)">All tags</div>` +
+      tags.map(t =>
+        `<div class="notes-tag-pill${notes.tagFilter === t ? " active" : ""}" onclick="notesSetTagFilter(${JSON.stringify(t)})">${esc(t)}</div>`
+      ).join("");
+  }).catch(() => { el.style.display = "none"; });
+}
+
+function notesSetTagFilter(tag) {
+  notes.tagFilter = tag;
+  notesLoadList(document.getElementById("notes-search-input").value.trim());
 }
 
 function notesRenderList() {
@@ -70,15 +117,35 @@ function notesRenderList() {
     list.innerHTML = '<div class="placeholder" style="padding:20px;text-align:center;color:var(--fg-muted);">No notes yet</div>';
     return;
   }
-  list.innerHTML = notes.list.map((n) => `
+  list.innerHTML = notes.list.map((n) => {
+    const isLog = n.note_type === 'daily_log';
+    const typeClass = isLog ? 'log' : 'disc';
+    const typeLabel = isLog ? 'LOG' : 'DISC';
+    let tagChips = "";
+    if (!isLog) {
+      try {
+        const tags = JSON.parse(n.tags || "[]");
+        if (tags.length) {
+          const shown = tags.slice(0, 3).map(t =>
+            `<span class="n-tag-chip${notes.tagFilter === t ? " active" : ""}" onclick="event.stopPropagation();notesSetTagFilter(${notes.tagFilter === t ? 'null' : JSON.stringify(t)})">${esc(t)}</span>`
+          ).join("");
+          const more = tags.length > 3 ? `<span class="n-tag-more">+${tags.length - 3}</span>` : "";
+          tagChips = `<div class="n-tags">${shown}${more}</div>`;
+        }
+      } catch {}
+    }
+    return `
     <div class="note-item${notes.current && notes.current.id === n.id ? " active" : ""}" onclick="notesSelect(${n.id})">
       <div class="n-title-row">
         <div class="n-title">${esc(n.title) || '<em style="color:var(--fg-muted)">Untitled</em>'}</div>
+        <span class="n-type-badge ${typeClass}">${typeLabel}</span>
         ${n.pinned ? '<span class="n-pin">PIN</span>' : ""}
       </div>
       <div class="n-date">${fmtDate(n.updated_at)}</div>
+      ${tagChips}
       <div class="n-preview">${esc(notesStripMentions(n.body).slice(0, 80))}</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function notesStripMentions(body) {
@@ -101,25 +168,58 @@ function notesRenderEditor() {
   document.getElementById("note-body").value                  = n.body  || "";
   document.getElementById("note-pin-btn").textContent         = n.pinned ? "Unpin" : "Pin";
   document.getElementById("note-save-status").textContent     = "";
+
+  const type = n.note_type || 'discussion';
+  document.getElementById("note-meta-discussion").style.display = type === 'discussion' ? "" : "none";
+  document.getElementById("note-meta-daily-log").style.display  = type === 'daily_log'  ? "" : "none";
+
+  if (type === 'discussion') {
+    try { _editTags = n.tags ? JSON.parse(n.tags) : []; } catch { _editTags = []; }
+    tagsRender();
+    document.getElementById("note-status-select").value = n.status || 'draft';
+  } else if (type === 'daily_log') {
+    document.getElementById("note-log-date").value = n.log_date || '';
+    document.getElementById("note-next-steps").value = n.next_steps || '';
+  }
+
   noteSetTab(auth.authenticated ? "edit" : "preview");
+}
+
+function _noteCollectPayload() {
+  const type   = (notes.current && notes.current.note_type) || 'discussion';
+  const title  = document.getElementById("note-title-input").value.trim() || "Untitled";
+  const body   = document.getElementById("note-body").value;
+  const pinned = notes.current ? notes.current.pinned : false;
+  const payload = { title, body, pinned, note_type: type };
+
+  if (type === 'discussion') {
+    // Flush any pending text in the tag input
+    const pendingText = document.getElementById("note-tags-text").value.trim();
+    if (pendingText) { tagsAdd(pendingText); document.getElementById("note-tags-text").value = ""; }
+    payload.tags = JSON.stringify(_editTags);
+    payload.status = document.getElementById("note-status-select").value;
+  } else if (type === 'daily_log') {
+    payload.log_date = document.getElementById("note-log-date").value || "";
+    payload.next_steps = document.getElementById("note-next-steps").value.trim();
+  }
+  return payload;
 }
 
 async function noteTogglePin() {
   if (!ensureWriteAuth()) return;
   if (!notes.current) return;
   clearTimeout(_noteSaveTimer);
-  const title  = document.getElementById("note-title-input").value.trim() || "Untitled";
-  const body   = document.getElementById("note-body").value;
-  const pinned = !notes.current.pinned;
+  const payload = _noteCollectPayload();
+  payload.pinned = !notes.current.pinned;
   try {
     const updated = await api(`/api/notes/${notes.current.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body, pinned }),
+      body: JSON.stringify(payload),
     });
     notes.current = updated;
     notes.dirty   = false;
-    document.getElementById("note-save-status").textContent = pinned ? "Pinned" : "Unpinned";
+    document.getElementById("note-save-status").textContent = payload.pinned ? "Pinned" : "Unpinned";
     await notesLoadList(document.getElementById("notes-search-input").value.trim());
     notesRenderEditor();
   } catch (e) {
@@ -127,13 +227,23 @@ async function noteTogglePin() {
   }
 }
 
-async function createNewNote() {
+async function createNewNote(type = 'discussion') {
   if (!ensureWriteAuth()) return;
   if (notes.dirty && !confirm("Discard unsaved changes?")) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const body = type === 'daily_log'
+    ? "## What was done\n\n\n## Observations / Surprises\n\n\n## Issues\n\n"
+    : "";
+  const payload = {
+    title: type === 'daily_log' ? `Log ${today}` : "New note",
+    body,
+    note_type: type,
+    ...(type === 'daily_log' ? { log_date: today } : {}),
+  };
   const n = await api("/api/notes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "New note", body: "" }),
+    body: JSON.stringify(payload),
   });
   notes.list.unshift(n);
   notes.current = n;
@@ -142,6 +252,80 @@ async function createNewNote() {
   notesRenderEditor();
   await notesBuildMentionTargets();
   setTimeout(() => document.getElementById("note-title-input").focus(), 50);
+}
+
+async function uploadNoteFile(input) {
+  if (!ensureWriteAuth()) return;
+  if (!input.files || input.files.length === 0) return;
+
+  // Filter to only .md files
+  const mdFiles = Array.from(input.files).filter(f =>
+    f.name.toLowerCase().endsWith('.md')
+  );
+
+  if (mdFiles.length === 0) {
+    alert('No Markdown (.md) files selected.');
+    input.value = '';
+    return;
+  }
+
+  if (mdFiles.length === 1) {
+    // Single file - existing behavior
+    const file = mdFiles[0];
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+
+      const note = await api('/api/notes/upload', {
+        method: 'POST',
+        body: fd
+      });
+
+      notes.list.unshift(note);
+      notes.current = note;
+      notes.dirty = false;
+      notesRenderList();
+      notesRenderEditor();
+      await notesBuildMentionTargets();
+
+    } catch (e) {
+      alert('Failed to upload note: ' + (e.message || 'Unknown error'));
+    } finally {
+      input.value = '';
+    }
+    return;
+  }
+
+  // Multiple files - upload sequentially
+  let succeeded = 0;
+  let failed = 0;
+  let failedNames = [];
+
+  for (const file of mdFiles) {
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+
+      const note = await api('/api/notes/upload', {
+        method: 'POST',
+        body: fd
+      });
+
+      notes.list.unshift(note);
+      succeeded++;
+    } catch (e) {
+      failed++;
+      failedNames.push(file.name);
+    }
+  }
+
+  // After all uploads
+  notesRenderList();
+  await notesBuildMentionTargets();
+  input.value = '';
+
+  let msg = `Upload complete:\n${succeeded} succeeded${failed > 0 ? `\n${failed} failed:\n${failedNames.join('\n')}` : ''}`;
+  alert(msg);
 }
 
 function noteMarkDirty() {
@@ -155,13 +339,12 @@ async function noteSave() {
   if (!ensureWriteAuth()) return;
   if (!notes.current) return;
   clearTimeout(_noteSaveTimer);
-  const title = document.getElementById("note-title-input").value.trim() || "Untitled";
-  const body  = document.getElementById("note-body").value;
+  const payload = _noteCollectPayload();
   try {
     const updated = await api(`/api/notes/${notes.current.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body }),
+      body: JSON.stringify(payload),
     });
     notes.current = updated;
     notes.dirty   = false;
@@ -210,20 +393,30 @@ function downloadCurrentNote() {
 
   const filename = `${slug}.md`;
 
-  // Use the same frontmatter format as the files on disk
-  const created_at = notes.current.created_at ? notes.current.created_at : "";
-  const updated_at = notes.current.updated_at ? notes.current.updated_at : "";
+  const n = notes.current;
+  const note_type = n.note_type || 'discussion';
+  const created_at = n.created_at || "";
+  const updated_at = n.updated_at || "";
 
-  const content = (
-    "---\n"
-    + `id: ${notes.current.id}\n`
+  let frontmatter = "---\n"
+    + `id: ${n.id}\n`
     + `title: ${title}\n`
-    + `pinned: ${String(notes.current.pinned).toLowerCase()}\n`
+    + `note_type: ${note_type}\n`
+    + `pinned: ${String(n.pinned).toLowerCase()}\n`
     + `created_at: ${created_at}\n`
-    + `updated_at: ${updated_at}\n`
-    + "---\n\n"
-    + body
-  );
+    + `updated_at: ${updated_at}\n`;
+
+  if (note_type === 'discussion') {
+    frontmatter += `tags: ${JSON.stringify(_editTags)}\n`;
+    frontmatter += `status: ${document.getElementById("note-status-select").value}\n`;
+  } else if (note_type === 'daily_log') {
+    frontmatter += `log_date: ${document.getElementById("note-log-date").value || ""}\n`;
+    const nextSteps = document.getElementById("note-next-steps").value.trim();
+    if (nextSteps) frontmatter += `next_steps: ${JSON.stringify(nextSteps)}\n`;
+  }
+  frontmatter += "---\n\n";
+
+  const content = frontmatter + body;
 
   // Create download
   const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
@@ -240,6 +433,50 @@ function downloadCurrentNote() {
 function notesApplySearch() {
   const q = document.getElementById("notes-search-input").value.trim();
   notesLoadList(q);
+}
+
+// ── Tag chip editor ───────────────────────────────────────────────────────
+
+function tagsRender() {
+  const container = document.getElementById("note-tags-chips");
+  if (!container) return;
+  container.innerHTML = _editTags.map((t, i) =>
+    `<span class="edit-tag-chip">${esc(t)}<button class="tag-chip-rm" onclick="tagsRemove(${i})" tabindex="-1">×</button></span>`
+  ).join("");
+}
+
+function tagsAdd(val) {
+  const tag = val.trim().toLowerCase();
+  if (!tag || _editTags.includes(tag)) return;
+  _editTags.push(tag);
+  tagsRender();
+  noteMarkDirty();
+}
+
+function tagsRemove(idx) {
+  _editTags.splice(idx, 1);
+  tagsRender();
+  noteMarkDirty();
+}
+
+function tagsHandleKey(e) {
+  const input = document.getElementById("note-tags-text");
+  if (e.key === "Enter" || e.key === ",") {
+    e.preventDefault();
+    tagsAdd(input.value);
+    input.value = "";
+  } else if (e.key === "Backspace" && !input.value && _editTags.length) {
+    tagsRemove(_editTags.length - 1);
+  }
+}
+
+function tagsHandleInput(e) {
+  // Allow pasting comma-separated tags
+  const input = document.getElementById("note-tags-text");
+  if (input.value.includes(",")) {
+    input.value.split(",").forEach(t => tagsAdd(t));
+    input.value = "";
+  }
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────

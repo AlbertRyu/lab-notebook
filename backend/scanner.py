@@ -60,18 +60,24 @@ def _read_meta_yaml(folder: Path) -> Optional[dict]:
 
 
 def _extract_ppms_meta(folder: Path) -> Optional[dict]:
-    """Try PPMS header extraction from .dat files directly in this folder.
+    """Try PPMS header extraction from .dat files.
 
-    Scans all .dat files and merges results: identity (sample+type) comes from
-    the best file, mass is taken from whichever file provides it. This handles
-    folders that contain mixed VSM/HC files where only HC files carry mass.
+    - Check for identity (sample+type) only in .dat files directly in this folder
+    - Search recursively into subfolders (stopping at sub-measurement boundaries)
+      just to find a mass if identity already came from meta.yaml
+
+    This handles:
+    - Folders where identity is in meta.yaml at root but mass is in a .dat inside subfolder
+    - Mixed VSM/HC folders where only HC files carry mass
+    - Does NOT accidentally turn parent folders into measurements that include all subfolders
     """
     from parsers.ppms import extract_header_meta
 
-    identity: Optional[dict] = None  # first file with sample+type
-    partial: Optional[dict] = None   # first file with any meta
-    mass: Optional[float] = None     # first mass found across all files
+    identity: Optional[dict] = None  # first file with sample+type (only checked in current folder)
+    partial: Optional[dict] = None   # first file with any meta (only checked in current folder)
+    mass: Optional[float] = None     # first mass found across all files + subfolders
 
+    # Step 1: check only files directly in this folder for identity
     for f in sorted(folder.iterdir()):
         if not (f.is_file() and f.suffix.lower() == ".dat"):
             continue
@@ -84,11 +90,49 @@ def _extract_ppms_meta(folder: Path) -> Optional[dict]:
             identity = meta
         if mass is None and meta.get("mass") is not None:
             mass = meta["mass"]
-        if identity is not None and mass is not None:
-            break  # have everything we need
+
+    # Step 2: if we don't have mass yet, search recursively for mass
+    # Start in current folder, then check parent folder's other subfolders (common case: IP/OOP split)
+    if mass is None:
+        stack = [folder]
+        # If we don't find mass in current tree and have a parent, also check parent's other subdirectories
+        # This handles common case where mass is only stored in one orientation (OOP/IP) but both orientations use the same crystal
+        parent = folder.parent
+        if parent != folder:
+            stack.append(parent)
+
+        while stack and mass is None:
+            current = stack.pop()
+            for f in sorted(current.iterdir()):
+                if f.name.startswith("."):
+                    continue
+                if f == folder:
+                    continue  # skip ourselves when searching from parent
+                if f.is_file() and f.suffix.lower() == ".dat":
+                    meta = extract_header_meta(str(f))
+                    if meta and meta.get("mass") is not None:
+                        mass = meta["mass"]
+                        break  # found mass, exit
+                elif f.is_dir():
+                    # Check if subfolder is its own measurement
+                    # Only skip if it's a different sample, but still allow searching it if it's same sample
+                    sub_meta = _read_meta_yaml(f)
+                    if sub_meta is not None and sub_meta.get("sample"):
+                        # If this subfolder is a measurement for the same sample, we *do* want to search it for mass
+                        # because it's likely another orientation (OOP/IP) of the same crystal
+                        sample_name_current = identity.get("sample") if identity else None
+                        sample_name_sub = sub_meta.get("sample")
+                        if sample_name_current != sample_name_sub:
+                            continue  # different sample, skip
+                    # Add to stack for searching
+                    stack.append(f)
 
     best = identity or partial
+    # Even if we didn't find any full identity (identity/partial is None), if we found mass return it
+    # This handles case where identity comes from meta.yaml but mass is in a .dat in a subfolder
     if best is None:
+        if mass is not None:
+            return {"mass": mass}
         return None
     if mass is not None:
         best = {**best, "mass": mass}
@@ -173,10 +217,12 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         session.add(exp)
         session.flush()
         added["experiments"] += 1
-    elif mass is not None and exp.mass is None:
-        # Backfill mass if it was missing on first import (e.g. HC files)
-        exp.mass = mass
-        session.add(exp)
+    elif mass is not None:
+        # Update mass if we now found it (even if it had a value before)
+        # This fixes rescans after enabling inner folder search
+        if exp.mass != mass:
+            exp.mass = mass
+            session.add(exp)
 
     for f in _collect_files(folder):
         try:

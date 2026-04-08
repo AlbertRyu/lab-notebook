@@ -1,10 +1,21 @@
 <div class="page" id="page-notes">
   <!-- Left: notes list -->
   <div id="notes-left">
-    <div style="padding:7px 10px;border-bottom:1px solid var(--border);display:flex;gap:6px;">
-      <span style="font-weight:700;font-size:13px;flex:1">Notes</span>
-      <button class="primary auth-write" id="notes-add-btn" onclick="createNewNote()">+ Note</button>
+    <div style="padding:7px 10px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <span style="font-weight:700;font-size:13px;flex:1 1 70px;min-width:0">Notes</span>
+      <button class="primary auth-write" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="createNewNote('discussion')">+ Discussion</button>
+      <button class="auth-write" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="createNewNote('daily_log')">+ Log</button>
+      <button class="auth-write" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="document.getElementById('note-upload-single').click()">Upload MD</button>
+      <button class="auth-write" style="font-size:11px;padding:3px 8px;white-space:nowrap;" onclick="document.getElementById('note-upload-folder').click()">Upload Folder</button>
+      <input type="file" id="note-upload-single" accept=".md" multiple style="display:none;" onchange="uploadNoteFile(this)" />
+      <input type="file" id="note-upload-folder" accept=".md" webkitdirectory directory style="display:none;" onchange="uploadNoteFile(this)" />
     </div>
+    <div id="notes-type-filter">
+      <div class="notes-type-pill active" data-type="all" onclick="notesSetTypeFilter('all')">All</div>
+      <div class="notes-type-pill" data-type="discussion" onclick="notesSetTypeFilter('discussion')">Discussion</div>
+      <div class="notes-type-pill" data-type="daily_log" onclick="notesSetTypeFilter('daily_log')">Daily Log</div>
+    </div>
+    <div id="notes-tag-filter" style="display:none;"></div>
     <div id="notes-search">
       <input id="notes-search-input" type="search" placeholder="Search notes…" oninput="notesApplySearch()" />
     </div>
@@ -33,6 +44,44 @@
       </div>
       <div id="note-editor">
         <input id="note-title-input" type="text" placeholder="Note title…" oninput="noteMarkDirty()" />
+
+        <!-- Discussion meta -->
+        <div id="note-meta-discussion" class="note-meta-panel" style="display:none;">
+          <div class="note-meta-row">
+            <div class="note-meta-field">
+              <label class="note-meta-label">Tags</label>
+              <div id="note-tags-field" class="tag-chips-field">
+                <div id="note-tags-chips"></div>
+                <input id="note-tags-text" type="text" placeholder="Add tag…"
+                  onkeydown="tagsHandleKey(event)" oninput="tagsHandleInput(event)" />
+              </div>
+            </div>
+            <div class="note-meta-field">
+              <label class="note-meta-label">Status</label>
+              <select id="note-status-select" onchange="noteMarkDirty()">
+                <option value="draft">Draft</option>
+                <option value="final">Final</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily log meta -->
+        <div id="note-meta-daily-log" class="note-meta-panel" style="display:none;">
+          <div class="note-meta-row">
+            <div class="note-meta-field">
+              <label class="note-meta-label">Date</label>
+              <input type="date" id="note-log-date" oninput="noteMarkDirty()" />
+            </div>
+          </div>
+          <div class="note-meta-row">
+            <div class="note-meta-field note-meta-field--full">
+              <label class="note-meta-label">Next Steps</label>
+              <textarea id="note-next-steps" class="note-next-steps-ta" placeholder="What to do next…" rows="2" oninput="noteMarkDirty()"></textarea>
+            </div>
+          </div>
+        </div>
+
         <div id="note-body-wrap">
           <textarea id="note-body"
             placeholder="Start writing… use @ to mention a sample or experiment."
