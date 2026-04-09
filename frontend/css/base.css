@@ -79,11 +79,14 @@ body {
   border-right: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   padding: 8px 0;
   gap: 4px;
   z-index: 10;
+  transition: width 0.18s ease;
+  overflow: hidden;
 }
+#nav.expanded { width: 172px; }
 #nav .nav-logo {
   font-size: 18px;
   margin-bottom: 8px;
@@ -94,14 +97,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
 }
 .nav-btn {
-  width: 36px;
   height: 36px;
   border-radius: 8px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 0 8px 0 calc((var(--nav-w) - 20px) / 2);
+  gap: 8px;
   cursor: pointer;
   font-size: 18px;
   color: var(--fg-muted);
@@ -109,15 +115,25 @@ body {
   border: none;
   background: none;
   position: relative;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .nav-btn:hover { background: var(--row-hover); color: var(--fg); }
 .nav-btn.active { background: var(--row-selected); color: var(--accent); }
-.nav-btn title { display: none; }
+.nav-label {
+  display: none;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#nav.expanded .nav-label { display: inline; }
+.nav-toggle { font-size: 20px; line-height: 1; justify-content: center; padding: 0; }
 #nav .spacer { flex: 1; }
 #nav .nav-bottom {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 4px;
 }
 

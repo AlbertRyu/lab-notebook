@@ -299,6 +299,65 @@ async def save_ppms_config(request: Request):
     return {"ok": True}
 
 
+# ── Boxes config (JSON file on disk) ──────────────────────────────────────
+
+BOXES_CONFIG_PATH = DATA_DIR_PATH / "boxes_config.json"
+
+
+@app.get("/api/boxes-config")
+def get_boxes_config():
+    if BOXES_CONFIG_PATH.exists():
+        try:
+            return json.loads(BOXES_CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"descriptions": {}}
+
+
+@app.post("/api/boxes-config")
+async def save_boxes_config(request: Request):
+    require_write_auth(request)
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Expected a JSON object")
+    BOXES_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    BOXES_CONFIG_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"ok": True}
+
+
+@app.get("/api/boxes")
+def list_boxes(session: Session = Depends(get_session)):
+    rows = session.exec(
+        select(Sample.id, Sample.name, Sample.compound, Sample.box).where(
+            Sample.box != None  # noqa: E711
+        )
+    ).all()
+    sample_map: dict[str, list] = {}
+    for sid, sname, scompound, sbox in rows:
+        sample_map.setdefault(sbox, []).append(
+            {"id": sid, "name": sname, "compound": scompound}
+        )
+    descriptions: dict = {}
+    if BOXES_CONFIG_PATH.exists():
+        try:
+            descriptions = json.loads(
+                BOXES_CONFIG_PATH.read_text(encoding="utf-8")
+            ).get("descriptions", {})
+        except Exception:
+            pass
+
+    def _nat_key(x: str):
+        return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", x)]
+
+    all_keys = sorted(set(sample_map) | set(descriptions), key=_nat_key)
+    return [
+        {"box": k, "samples": sample_map.get(k, []), "description": descriptions.get(k)}
+        for k in all_keys
+    ]
+
+
 # ── Static files ───────────────────────────────────────────────────────────
 
 app.mount("/files", StaticFiles(directory=str(DATA_DIR_PATH)), name="files")
@@ -503,7 +562,7 @@ async def upload_sample_file(
     sample = session.get(Sample, sample_id)
     if not sample:
         raise HTTPException(404, "Sample not found")
-    save_dir = DATA_DIR_PATH / "samples" / sample.name / "photos"
+    save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / "photos"
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / file.filename
     save_path.write_bytes(await file.read())
@@ -576,7 +635,7 @@ async def upload_file(
         raise HTTPException(404, "Experiment not found")
 
     sample = session.get(Sample, exp.sample_id)
-    save_dir = DATA_DIR_PATH / "samples" / sample.name / exp.type
+    save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / exp.type
     save_dir.mkdir(parents=True, exist_ok=True)
 
     save_path = save_dir / file.filename

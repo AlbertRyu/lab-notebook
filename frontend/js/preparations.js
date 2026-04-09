@@ -142,7 +142,7 @@ function _prepCompoundSelectHtml(currentValue) {
     `<option value="${esc(c)}"${c === currentValue && !isCustom ? " selected" : ""}>${esc(c)}</option>`
   ).join("");
   return `
-    <select id="f-compound-sel" onchange="toggleModalCustomCompound()">
+    <select id="f-compound-sel" onchange="toggleModalCustomCompound();autoFillSampleName()">
       ${!currentValue ? '<option value="">— select —</option>' : ""}
       ${opts}
       <option value="__custom__"${isCustom ? " selected" : ""}>Other…</option>
@@ -155,7 +155,7 @@ function _prepCompoundSelectHtml(currentValue) {
 function prepOpenAddSample() {
   if (!ensureWriteAuth()) return;
   modalOpen("Add Sample", `
-    <div class="form-row"><label>Name *</label><input id="f-name" placeholder="4Br-Mn-BA-001"></div>
+    <div class="form-row"><label>Name *</label><input id="f-name" placeholder="auto-filled on compound selection" oninput="this.dataset.userEdited=this.value?'true':''"></div>
     <div class="form-row"><label>Compound *</label>${_prepCompoundSelectHtml(null)}</div>
     <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date"></div>
     <div class="form-row"><label>Batch</label><input id="f-batch"></div>

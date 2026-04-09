@@ -14,6 +14,15 @@ function toggleTheme() {
   if (_vizPlotted) vizRenderPlot();
 }
 
+function toggleNav() {
+  const nav = document.getElementById("nav");
+  const expanded = nav.classList.toggle("expanded");
+  localStorage.setItem("nav-expanded", expanded ? "1" : "0");
+  const btn = document.querySelector(".nav-toggle");
+  btn.textContent = expanded ? "‹" : "›";
+  btn.title = expanded ? "Collapse sidebar" : "Expand sidebar";
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   if (!res.ok) {
@@ -49,6 +58,7 @@ function applyAuthUi() {
     "prep-add-sample-btn", "prep-detail-edit-btn", "prep-detail-delete-btn",
     "notes-add-btn", "note-save-btn", "note-pin-btn", "note-delete-btn",
     "note-title-input", "note-body",
+    "bx-add-btn",
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.disabled = !auth.authenticated;
@@ -58,6 +68,7 @@ function applyAuthUi() {
   if (noteTabEdit) noteTabEdit.style.display = auth.authenticated ? "" : "none";
 
   if (notes.current) noteSetTab(auth.authenticated ? "edit" : "preview");
+  bxApplyAuth();
 }
 
 function ensureWriteAuth() {
@@ -134,6 +145,7 @@ function showPage(name) {
     });
   }
   if (name === "notes" && !_notesLoaded) notesInit();
+  if (name === "boxes" && !_bxLoaded) bxInit();
   if (name === "overview") ovShow();
 }
 
@@ -252,7 +264,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "inventory", "preparations", "viz", "notes", "graph"];
+  const tabs = ["overview", "inventory", "preparations", "viz", "notes", "graph", "boxes"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))
@@ -266,6 +278,12 @@ async function loadTabs() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  if (localStorage.getItem("nav-expanded") === "1") {
+    document.getElementById("nav").classList.add("expanded");
+    const btn = document.querySelector(".nav-toggle");
+    btn.textContent = "‹";
+    btn.title = "Collapse sidebar";
+  }
   await loadTabs();
   await authInit();
   await invInit();

@@ -442,7 +442,7 @@ function _compoundSelectHtml(currentValue) {
     `<option value="${esc(c)}"${c === currentValue && !isCustom ? " selected" : ""}>${esc(c)}</option>`
   ).join("");
   return `
-    <select id="f-compound-sel" onchange="toggleModalCustomCompound()">
+    <select id="f-compound-sel" onchange="toggleModalCustomCompound();autoFillSampleName()">
       ${!currentValue ? '<option value="">— select —</option>' : ""}
       ${opts}
       <option value="__custom__"${isCustom ? " selected" : ""}>Other…</option>
@@ -455,7 +455,13 @@ function _compoundSelectHtml(currentValue) {
 function toggleModalCustomCompound() {
   const sel = document.getElementById("f-compound-sel")?.value;
   const inp = document.getElementById("f-compound");
-  if (inp) inp.style.display = sel === "__custom__" ? "" : "none";
+  if (inp) {
+    inp.style.display = sel === "__custom__" ? "" : "none";
+    if (sel === "__custom__" && !inp.dataset.blurAttached) {
+      inp.addEventListener("blur", autoFillSampleName);
+      inp.dataset.blurAttached = "true";
+    }
+  }
 }
 
 function getModalCompoundValue() {
@@ -466,10 +472,29 @@ function getModalCompoundValue() {
   return sel.value;
 }
 
+async function autoFillSampleName() {
+  const compound = getModalCompoundValue();
+  const nameInput = document.getElementById("f-name");
+  if (!compound || !nameInput) return;
+  if (nameInput.dataset.userEdited === "true") return;
+
+  const samples = await api(`/api/samples?compound=${encodeURIComponent(compound)}`);
+  let maxN = 0;
+  const prefix = compound + " - ";
+  for (const s of (samples || [])) {
+    if (s.name.startsWith(prefix)) {
+      const suffix = s.name.slice(prefix.length);
+      const n = parseInt(suffix, 10);
+      if (!isNaN(n) && String(n) === suffix && n > maxN) maxN = n;
+    }
+  }
+  nameInput.value = `${compound} - ${maxN + 1}`;
+}
+
 function openAddSample() {
   if (!ensureWriteAuth()) return;
   modalOpen("Add Sample", `
-    <div class="form-row"><label>Name *</label><input id="f-name" placeholder="4Br-Mn-BA-001"></div>
+    <div class="form-row"><label>Name *</label><input id="f-name" placeholder="auto-filled on compound selection" oninput="this.dataset.userEdited=this.value?'true':''"></div>
     <div class="form-row"><label>Compound *</label>${_compoundSelectHtml(null)}</div>
     <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date"></div>
     <div class="form-row"><label>Batch</label><input id="f-batch"></div>
