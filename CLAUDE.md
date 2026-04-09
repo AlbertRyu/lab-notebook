@@ -24,6 +24,7 @@ docker compose up --build
 ```
 
 Environment variables (see `docker-compose.yml`):
+
 - `LAB_NOTEBOOK_PASSWORD` — login password
 - `AUTH_SECRET` — HMAC signing key for the auth cookie
 - `AUTH_COOKIE_SECURE` — set `true` behind HTTPS (default: false)
@@ -87,6 +88,7 @@ lab_notebook_summary.md
 **Tab system:** Each tab is an HTML fragment in `frontend/tabs/`. `main.js` injects them into `#pages` and fires per-tab init functions. Each tab has its own `frontend/js/<tab>.js` and `frontend/css/<tab>.css`.
 
 **Current tabs:**
+
 - `overview` — Main landing page with compound summary cards
 - `inventory` — Sample/experiment management (create/edit/delete samples, experiments, upload files)
 - `graph` — Single-experiment interactive visualization with Plotly
@@ -122,21 +124,25 @@ lab_notebook_summary.md
 Experiment types: `ppms-vsm`, `ppms-hc`, `pxrd`, `sxrd`, `microscopy`, `fmr`
 
 New experiment fields:
+
 - `orientation` — For PPMS-VSM: "OOP" (Out-of-Plane), "IP" (In-Plane), or custom text
 - `mass` — Sample mass in mg for PPMS-VSM/HC calculations
 
 ## API Routes
 
 **Auth:**
+
 - `GET /api/auth/me` — Check auth status
 - `POST /api/auth/login` — Login
 - `POST /api/auth/logout` — Logout
 
 **PPMS config:**
+
 - `GET /api/ppms-config` — Get compound card config
 - `POST /api/ppms-config` — Save compound card config
 
 **Samples:**
+
 - `GET /api/samples` — List all samples (with filtering)
 - `GET /api/samples/{id}` — Get sample with experiments/files
 - `POST /api/samples` — Create sample
@@ -146,6 +152,7 @@ New experiment fields:
 - `DELETE /api/samples/{id}/files/{id}` — Delete sample photo
 
 **Experiments:**
+
 - `POST /api/experiments` — Create experiment
 - `GET /api/experiments/{id}` — Get experiment details
 - `PUT /api/experiments/{id}` — Update experiment
@@ -155,17 +162,21 @@ New experiment fields:
 - `DELETE /api/experiments/{id}/files/{id}` — Delete experiment file
 
 **Scanning:**
+
 - `POST /api/scan` — Trigger full scan of all scan roots
 - `POST /api/scan/folder` — Accept and scan uploaded folder
 
 **Filters:**
+
 - `GET /api/filters` — Get filter options (compounds, batches, boxes)
 
 **Visualization:**
+
 - `GET /api/files` — List all data files with context
 - `POST /api/plot` — Get Plotly traces for multi-file plotting
 
 **Notes:**
+
 - `GET /api/notes` — List notes (with optional search)
 - `GET /api/notes/{id}` — Get note
 - `POST /api/notes` — Create note
@@ -173,6 +184,7 @@ New experiment fields:
 - `DELETE /api/notes/{id}` — Delete note
 
 **Static files:**
+
 - `/files/*` — Serve files from DATA_DIR
 - `/static/*` — Serve frontend static files
 

@@ -119,9 +119,26 @@ function graphNeighborSet() {
   const hovered = graph.hoverKey;
   if (!hovered) return null;
   const set = new Set([hovered]);
+
+  // First add all direct connections
   graph.edges.forEach((edge) => {
-    if (edge.source === hovered || edge.target === hovered) { set.add(edge.source); set.add(edge.target); }
+    if (edge.source === hovered || edge.target === hovered) {
+      set.add(edge.source);
+      set.add(edge.target);
+    }
   });
+
+  // Then recursively add all descendants via "owns" edges (compound → sample → experiment)
+  let size;
+  do {
+    size = set.size;
+    graph.edges.forEach((edge) => {
+      if (set.has(edge.source) && edge.rel === "owns") {
+        set.add(edge.target);
+      }
+    });
+  } while (set.size > size); // keep going until no new descendants are added
+
   return set;
 }
 
