@@ -8,14 +8,6 @@ let _vizLoaded = false, _vizPlotted = false, _vizInitPromise = null;
 async function vizInit() {
   _vizLoaded = true;
   _vizInitPromise = (async () => {
-    // Populate sample filter
-    try {
-      const samples = await api("/api/samples");
-      const sel = document.getElementById("viz-sample-filter");
-      sel.innerHTML = '<option value="">All samples</option>' +
-        samples.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
-    } catch (_) {}
-
     document.getElementById("viz-select-all").addEventListener("change", function () {
       const checked = this.checked;
       document.querySelectorAll("#viz-tbody input[type=checkbox]").forEach((cb) => {
@@ -29,19 +21,29 @@ async function vizInit() {
   await _vizInitPromise;
 }
 
-async function vizOnSampleChange() {
-  const sampleId = document.getElementById("viz-sample-filter").value;
-  const measSel  = document.getElementById("viz-meas-filter");
-  measSel.innerHTML = '<option value="">All measurements</option>';
-  measSel.style.display = sampleId ? "" : "none";
+// Called when exp-type changes: reload all files, rebuild sample dropdown, reset dependent filters
+async function vizOnTypeChange() {
+  document.getElementById("viz-sample-filter").value = "";
+  document.getElementById("viz-meas-filter").value = "";
+  document.getElementById("viz-meas-filter").style.display = "none";
   await vizLoadFiles();
 }
 
+// Called when sample changes: rebuild meas dropdown from already-loaded allFiles, re-render
+function vizOnSampleChange() {
+  document.getElementById("viz-meas-filter").value = "";
+  vizPopulateMeasFilter();
+  vizRenderTable();
+}
+
+// Called when meas filter changes: just re-render
+function vizOnMeasChange() {
+  vizRenderTable();
+}
+
 async function vizLoadFiles() {
-  const type     = document.getElementById("viz-exp-type").value;
-  const sampleId = document.getElementById("viz-sample-filter").value;
-  const p        = new URLSearchParams({ exp_type: type });
-  if (sampleId) p.set("sample_id", sampleId);
+  const type = document.getElementById("viz-exp-type").value;
+  const p    = new URLSearchParams({ exp_type: type });
 
   vizSetStatus("Loading…", "busy");
   try {
@@ -51,8 +53,8 @@ async function vizLoadFiles() {
     viz.allFiles.forEach((f) => {
       viz.fileModes[f.id] = type.startsWith("ppms") ? f.auto_mode || "MT" : "";
     });
+    vizPopulateSampleFilter();
     vizPopulateMeasFilter();
-    viz.files = viz.allFiles;
     vizRenderTable();
     vizSetStatus(`${viz.files.length} file${viz.files.length !== 1 ? "s" : ""} found.`, "ready");
   } catch (e) {
@@ -60,12 +62,32 @@ async function vizLoadFiles() {
   }
 }
 
-function vizPopulateMeasFilter() {
-  const sel = document.getElementById("viz-meas-filter");
+// Rebuild sample dropdown from currently loaded allFiles
+function vizPopulateSampleFilter() {
+  const sel  = document.getElementById("viz-sample-filter");
   const prev = sel.value;
-  // Build unique experiments from allFiles
   const seen = new Map();
   viz.allFiles.forEach((f) => {
+    if (!seen.has(f.sample_id)) seen.set(f.sample_id, f.sample_name);
+  });
+  sel.innerHTML = '<option value="">All samples</option>' +
+    Array.from(seen.entries()).map(([id, name]) =>
+      `<option value="${id}"${prev == id ? " selected" : ""}>${esc(name)}</option>`
+    ).join("");
+}
+
+// Rebuild measurement dropdown from allFiles, filtered by the current sample selection
+function vizPopulateMeasFilter() {
+  const sampleId = document.getElementById("viz-sample-filter").value;
+  const sel      = document.getElementById("viz-meas-filter");
+  sel.style.display = sampleId ? "" : "none";
+
+  const source = sampleId
+    ? viz.allFiles.filter((f) => f.sample_id == sampleId)
+    : viz.allFiles;
+
+  const seen = new Map();
+  source.forEach((f) => {
     if (!seen.has(f.experiment_id)) {
       const parts = [];
       if (f.exp_orientation) parts.push(f.exp_orientation);
@@ -75,15 +97,18 @@ function vizPopulateMeasFilter() {
   });
   sel.innerHTML = '<option value="">All measurements</option>' +
     Array.from(seen.entries()).map(([id, label]) =>
-      `<option value="${id}"${prev == id ? " selected" : ""}>${esc(label)}</option>`
+      `<option value="${id}">${esc(label)}</option>`
     ).join("");
 }
 
 function vizRenderTable() {
-  const measId = document.getElementById("viz-meas-filter").value;
-  viz.files = measId
-    ? viz.allFiles.filter((f) => f.experiment_id == measId)
-    : viz.allFiles;
+  const sampleId = document.getElementById("viz-sample-filter").value;
+  const measId   = document.getElementById("viz-meas-filter").value;
+  viz.files = viz.allFiles.filter((f) => {
+    if (sampleId && f.sample_id != sampleId) return false;
+    if (measId   && f.experiment_id != measId) return false;
+    return true;
+  });
   // Drop selections no longer visible
   viz.selected.forEach((id) => { if (!viz.files.find((f) => f.id === id)) viz.selected.delete(id); });
 
@@ -96,8 +121,10 @@ function vizRenderTable() {
   }
 
   tbody.innerHTML = viz.files.map((f) => {
-    const isPpms  = document.getElementById("viz-exp-type").value.startsWith("ppms");
-    const modeCtrl = isPpms
+    const expType = document.getElementById("viz-exp-type").value;
+    const isPpms  = expType.startsWith("ppms");
+    const isHC    = expType === "ppms-hc";
+    const modeCtrl = isPpms && !isHC
       ? `<div class="mode-group">${["MT", "MH"].map((m) =>
           `<label><input type="radio" name="vm-${f.id}" value="${m}" ${viz.fileModes[f.id] === m ? "checked" : ""}
             onchange="viz.fileModes[${f.id}]='${m}'"> ${m}</label>`

@@ -131,11 +131,32 @@ async function prepDeleteSamplePhoto(sampleId, fileId) {
 
 // ── Modals (Add / Edit sample) ───────────────────────────────────────────
 
-function openAddSample() {
+function _prepCompoundSelectHtml(currentValue) {
+  const compounds = Array.from(document.getElementById("prep-compound").options)
+    .map((o) => o.value).filter((v) => v);
+  if (compounds.length === 0) {
+    return `<input id="f-compound" type="text" placeholder="4Br-Mn-BA" value="${esc(currentValue || "")}">`;
+  }
+  const isCustom = !!currentValue && !compounds.includes(currentValue);
+  const opts = compounds.map((c) =>
+    `<option value="${esc(c)}"${c === currentValue && !isCustom ? " selected" : ""}>${esc(c)}</option>`
+  ).join("");
+  return `
+    <select id="f-compound-sel" onchange="toggleModalCustomCompound()">
+      ${!currentValue ? '<option value="">— select —</option>' : ""}
+      ${opts}
+      <option value="__custom__"${isCustom ? " selected" : ""}>Other…</option>
+    </select>
+    <input id="f-compound" type="text" placeholder="Type compound name"
+      value="${esc(isCustom ? currentValue : "")}"
+      style="display:${isCustom ? "" : "none"};margin-top:4px;width:100%;box-sizing:border-box;">`;
+}
+
+function prepOpenAddSample() {
   if (!ensureWriteAuth()) return;
   modalOpen("Add Sample", `
     <div class="form-row"><label>Name *</label><input id="f-name" placeholder="4Br-Mn-BA-001"></div>
-    <div class="form-row"><label>Compound *</label><input id="f-compound" placeholder="4Br-Mn-BA"></div>
+    <div class="form-row"><label>Compound *</label>${_prepCompoundSelectHtml(null)}</div>
     <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date"></div>
     <div class="form-row"><label>Batch</label><input id="f-batch"></div>
     <div class="form-row"><label>Box</label><input id="f-box"></div>
@@ -144,7 +165,7 @@ function openAddSample() {
   `, async () => {
     const payload = {
       name:           document.getElementById("f-name").value.trim(),
-      compound:       document.getElementById("f-compound").value.trim(),
+      compound:       getModalCompoundValue(),
       synthesis_date: document.getElementById("f-date").value || null,
       batch:          document.getElementById("f-batch").value.trim() || null,
       box:            document.getElementById("f-box").value.trim()   || null,
@@ -159,7 +180,7 @@ function openAddSample() {
   });
 }
 
-async function deleteSample() {
+async function prepDeleteSample() {
   if (!ensureWriteAuth()) return;
   if (!prep.current) return;
   if (!confirm(`Delete sample "${prep.current.name}"?\n\nThis cannot be undone.`)) return;
@@ -172,11 +193,11 @@ async function deleteSample() {
   document.getElementById("prep-detail-placeholder").style.display = "flex";
 }
 
-function openEditSample() {
+function prepOpenEditSample() {
   if (!ensureWriteAuth()) return;
   const s = prep.current;
   modalOpen("Edit Sample", `
-    <div class="form-row"><label>Compound *</label><input id="f-compound" value="${esc(s.compound)}"></div>
+    <div class="form-row"><label>Compound *</label>${_prepCompoundSelectHtml(s.compound)}</div>
     <div class="form-row"><label>Synthesis date</label><input id="f-date" type="date" value="${s.synthesis_date || ""}"></div>
     <div class="form-row"><label>Batch</label><input id="f-batch" value="${esc(s.batch || "")}"></div>
     <div class="form-row"><label>Box</label><input id="f-box" value="${esc(s.box || "")}"></div>
@@ -185,7 +206,7 @@ function openEditSample() {
   `, async () => {
     const payload = {
       name:           s.name,
-      compound:       document.getElementById("f-compound").value.trim(),
+      compound:       getModalCompoundValue(),
       synthesis_date: document.getElementById("f-date").value     || null,
       batch:          document.getElementById("f-batch").value.trim() || null,
       box:            document.getElementById("f-box").value.trim()   || null,

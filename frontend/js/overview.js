@@ -115,13 +115,11 @@ async function ovLoadLive() {
         samples.forEach((s) => {
           const tr = document.createElement("tr");
           tr.onclick = () => { showPage("inventory"); invSelectSample(s.id); };
-          const d = s.synthesis_date ? s.synthesis_date.slice(0, 10) : "—";
           tr.innerHTML = `
             <td><strong>${esc(s.name)}</strong></td>
             <td>${esc(s.compound)}</td>
             <td>${esc(s.batch || "—")}</td>
             <td>${esc(s.box   || "—")}</td>
-            <td style="color:var(--fg-muted)">${d}</td>
           `;
           tbody.appendChild(tr);
         });

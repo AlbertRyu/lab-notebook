@@ -13,7 +13,10 @@ import math
 from pathlib import Path
 from typing import Optional
 
-KEEP = re.compile(r"^(Temperature \(|Magnetic Field \(|Moment \(|M\. Std\. Err\. \()")
+KEEP = re.compile(
+    r"^(Temperature \(|Magnetic Field \(|Moment \(|M\. Std\. Err\. \("
+    r"|Sample Temp \(|Samp HC \(|Samp HC Err \(|Field \()"
+)
 
 
 def parse_dat(path: str) -> Optional[dict]:
@@ -50,6 +53,9 @@ def parse_dat(path: str) -> Optional[dict]:
 
 
 def detect_mode(df: dict) -> str:
+    if "Samp HC (µJ/K)" in df:
+        return "HC"
+
     def _clean(vals: list) -> list[float]:
         return [
             float(v) for v in vals if isinstance(v, (int, float)) and math.isfinite(v)
@@ -169,6 +175,25 @@ def extract_header_meta(path: str) -> dict:
 
 
 def to_traces(df: dict, mode: str, label: str, mass: Optional[float] = None) -> list[dict]:
+    if mode == "HC":
+        T   = df.get("Sample Temp (Kelvin)", [])
+        HC  = df.get("Samp HC (µJ/K)", [])
+        Err = df.get("Samp HC Err (µJ/K)", [])
+        normalize = mass is not None and mass > 0
+        x, y, err = [], [], []
+        for i in range(min(len(T), len(HC))):
+            if T[i] == T[i] and HC[i] == HC[i]:  # NaN guard
+                x.append(T[i])
+                y.append(HC[i] / mass if normalize else HC[i])
+                if i < len(Err) and Err[i] == Err[i]:
+                    err.append(Err[i] / mass if normalize else Err[i])
+        trace: dict = {"x": x, "y": y, "mode": "markers", "name": label, "type": "scatter",
+                       "marker": {"size": 4}}
+        if err:
+            trace["error_y"] = {"type": "data", "array": err, "visible": True,
+                                 "thickness": 1, "width": 3}
+        return [trace]
+
     T = df.get("Temperature (K)", [])
     H = df.get("Magnetic Field (Oe)", [])
     M = df.get("Moment (emu)", [])

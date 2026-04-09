@@ -6,6 +6,7 @@ import hashlib
 import shutil
 import re
 import time
+import yaml
 from pathlib import Path
 from typing import Optional
 
@@ -192,10 +193,46 @@ def _migrate_notes_table() -> None:
         conn.commit()
 
 
+def _migrate_datafile_table() -> None:
+    """Add auto_mode column to datafile table and backfill existing PPMS rows."""
+    from database import engine
+    with engine.connect() as conn:
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(datafile)"))}
+        if "auto_mode" not in existing:
+            conn.execute(text("ALTER TABLE datafile ADD COLUMN auto_mode VARCHAR"))
+            conn.commit()
+
+    # Backfill: detect mode for PPMS data files that have auto_mode = NULL
+    from sqlmodel import Session as _Session
+    from parsers.ppms import parse_dat, detect_mode
+    with _Session(engine) as session:
+        stmt = (
+            select(DataFile, Experiment)
+            .join(Experiment, DataFile.experiment_id == Experiment.id)
+            .where(DataFile.file_type == "data")
+            .where(DataFile.auto_mode == None)  # noqa: E711
+            .where(Experiment.type.in_(["ppms-vsm", "ppms-hc"]))
+        )
+        rows = session.exec(stmt).all()
+        updated = 0
+        for df, _exp in rows:
+            try:
+                abs_path = str(DATA_DIR_PATH / df.path)
+                parsed = parse_dat(abs_path)
+                df.auto_mode = detect_mode(parsed) if parsed else None
+                session.add(df)
+                updated += 1
+            except Exception:
+                pass
+        if updated:
+            session.commit()
+
+
 @app.on_event("startup")
 def on_startup():
     create_db()
     _migrate_notes_table()
+    _migrate_datafile_table()
     _seed_if_empty()
     # Sync all existing notes to markdown files
     from database import engine
@@ -372,6 +409,45 @@ def create_sample(
     return sample
 
 
+def _sync_sample_to_meta_yaml(sample: Sample, session: Session) -> None:
+    """Write sample meta fields back to all meta.yaml files for this sample's experiments."""
+    experiments = session.exec(
+        select(Experiment).where(Experiment.sample_id == sample.id)
+    ).all()
+    sample_fields = {
+        "compound": sample.compound,
+        "synthesis_date": sample.synthesis_date,
+        "batch": sample.batch,
+        "box": sample.box,
+        "crystal_size": sample.crystal_size,
+        "sample_notes": sample.notes,
+    }
+    for exp in experiments:
+        if not exp.source_path:
+            continue
+        folder = Path(exp.source_path)
+        if not folder.is_dir():
+            continue
+        meta_path = folder / "meta.yaml"
+        try:
+            existing = (
+                yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
+                if meta_path.exists()
+                else {}
+            )
+        except Exception:
+            existing = {}
+        for k, v in sample_fields.items():
+            if v is not None:
+                existing[k] = v
+            else:
+                existing.pop(k, None)
+        meta_path.write_text(
+            yaml.dump(existing, allow_unicode=True, sort_keys=False, default_flow_style=False),
+            encoding="utf-8",
+        )
+
+
 @app.put("/api/samples/{sample_id}", response_model=SampleRead)
 def update_sample(
     sample_id: int,
@@ -387,6 +463,7 @@ def update_sample(
     session.add(sample)
     session.commit()
     session.refresh(sample)
+    _sync_sample_to_meta_yaml(sample, session)
     return sample
 
 
@@ -507,11 +584,21 @@ async def upload_file(
     save_path.write_bytes(content)
 
     rel_path = save_path.relative_to(DATA_DIR_PATH).as_posix()
+    auto_mode = None
+    if file_type == "data" and exp.type in {"ppms-vsm", "ppms-hc"}:
+        try:
+            from parsers.ppms import parse_dat, detect_mode
+            df_data = parse_dat(str(save_path))
+            auto_mode = detect_mode(df_data) if df_data else None
+        except Exception:
+            auto_mode = None
+
     df = DataFile(
         experiment_id=exp_id,
         filename=file.filename,
         path=rel_path,
         file_type=file_type,
+        auto_mode=auto_mode,
     )
     session.add(df)
     session.commit()
@@ -773,17 +860,6 @@ def list_files(
     out: list[FileWithContext] = []
 
     for f, exp, s in rows:
-        auto_mode = None
-        if exp.type in {"ppms-vsm", "ppms-hc"}:
-            try:
-                from parsers.ppms import parse_dat, detect_mode
-
-                abs_path = str(DATA_DIR_PATH / f.path)
-                df = parse_dat(abs_path)
-                auto_mode = detect_mode(df) if df else None
-            except Exception:
-                auto_mode = None
-
         out.append(
             FileWithContext(
                 id=f.id,
@@ -796,7 +872,7 @@ def list_files(
                 exp_orientation=exp.orientation,
                 sample_id=s.id,
                 sample_name=s.name,
-                auto_mode=auto_mode,
+                auto_mode=f.auto_mode,
             )
         )
 
@@ -859,11 +935,12 @@ def plot_files(
                 continue
             m = mode or detect_mode(df)
             traces.extend(ppms_traces(df, m, f.filename, exp.mass))
-            xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
-            if exp.mass is not None and exp.mass > 0:
-                yaxis_title = "Moment (emu/mg)"
+            if m == "HC":
+                xaxis_title = "Temperature (K)"
+                yaxis_title = "Specific Heat (µJ/K/mg)" if (exp.mass is not None and exp.mass > 0) else "Heat Capacity (µJ/K)"
             else:
-                yaxis_title = "Moment (emu)"
+                xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
+                yaxis_title = "Moment (emu/mg)" if (exp.mass is not None and exp.mass > 0) else "Moment (emu)"
 
         elif exp.type in {"pxrd", "sxrd"}:
             from parsers.pxrd import parse_pxrd, to_traces as pxrd_traces

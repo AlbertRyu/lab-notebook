@@ -47,6 +47,7 @@ class DataFile(SQLModel, table=True):
     filename: str
     path: str  # relative to DATA_DIR
     file_type: str  # image | data | screenshot
+    auto_mode: Optional[str] = Field(default=None)  # cached MT/MH/HC mode for PPMS files
 
     experiment: Optional[Experiment] = Relationship(back_populates="files")
 

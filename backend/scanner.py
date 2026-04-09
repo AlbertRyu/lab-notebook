@@ -181,6 +181,28 @@ def _upsert_sample(session: Session, meta: dict, added: dict) -> Sample:
         session.add(sample)
         session.flush()
         added["samples"] += 1
+    else:
+        # Update existing sample fields from meta.yaml when the key is explicitly present
+        changed = False
+        field_map = {
+            "compound": "compound",
+            "synthesis_date": "synthesis_date",
+            "batch": "batch",
+            "crystal_size": "crystal_size",
+            "sample_notes": "notes",
+        }
+        for yaml_key, db_attr in field_map.items():
+            if yaml_key in meta:
+                val = meta[yaml_key]
+                if yaml_key == "synthesis_date" and val is not None:
+                    val = str(val)
+                setattr(sample, db_attr, val or None)
+                changed = True
+        if "box" in meta:
+            sample.box = str(meta["box"]) if meta.get("box") is not None else None
+            changed = True
+        if changed:
+            session.add(sample)
     return sample
 
 
@@ -238,11 +260,22 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         except ValueError:
             filename = f.name
 
+        ftype = _file_type(f)
+        auto_mode = None
+        if ftype == "data" and exp_type in {"ppms-vsm", "ppms-hc"}:
+            try:
+                from parsers.ppms import parse_dat, detect_mode
+                df_data = parse_dat(str(f))
+                auto_mode = detect_mode(df_data) if df_data else None
+            except Exception:
+                auto_mode = None
+
         session.add(DataFile(
             experiment_id=exp.id,
             filename=filename,
             path=rel_path,
-            file_type=_file_type(f),
+            file_type=ftype,
+            auto_mode=auto_mode,
         ))
         added["files"] += 1
 

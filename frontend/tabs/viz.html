@@ -2,7 +2,7 @@
   <!-- Left: file picker -->
   <div id="viz-left">
     <div id="viz-toolbar">
-      <select id="viz-exp-type" onchange="vizOnSampleChange()">
+      <select id="viz-exp-type" onchange="vizOnTypeChange()">
         <option value="ppms-vsm">PPMS-VSM</option>
         <option value="ppms-hc">PPMS-HC</option>
         <option value="pxrd">PXRD</option>
@@ -11,7 +11,7 @@
       <select id="viz-sample-filter" onchange="vizOnSampleChange()">
         <option value="">All samples</option>
       </select>
-      <select id="viz-meas-filter" onchange="vizRenderTable()" style="display:none">
+      <select id="viz-meas-filter" onchange="vizOnMeasChange()" style="display:none">
         <option value="">All measurements</option>
       </select>
     </div>
