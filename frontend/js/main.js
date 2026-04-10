@@ -264,7 +264,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "inventory", "preparations", "viz", "notes", "graph", "boxes"];
+  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "notes", "graph"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))

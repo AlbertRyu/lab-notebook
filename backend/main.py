@@ -635,7 +635,10 @@ async def upload_file(
         raise HTTPException(404, "Experiment not found")
 
     sample = session.get(Sample, exp.sample_id)
-    save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / exp.type
+    if exp.type == "ppms-vsm" and exp.orientation:
+        save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / exp.type / exp.orientation
+    else:
+        save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / exp.type
     save_dir.mkdir(parents=True, exist_ok=True)
 
     save_path = save_dir / file.filename
