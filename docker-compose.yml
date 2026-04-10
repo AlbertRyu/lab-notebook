@@ -5,14 +5,14 @@ services:
     ports:
       - "8100:8000"
     volumes:
-      - ./data:/data # SQLite DB + config
-      - ${SAMPLES_DIR:-./data/samples}:/data/samples # experimental data (configurable)
+      - ${DATA_DIR:-./data}:/data
       - ./frontend:/app/frontend # hot-reload HTML without rebuild
     environment:
       - LAB_NOTEBOOK_PASSWORD=${LAB_NOTEBOOK_PASSWORD:-change-me}
       - AUTH_SECRET=${AUTH_SECRET:-change-this-secret}
       - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-false}
       - AUTH_TTL_SECONDS=${AUTH_TTL_SECONDS:-28800}
+      - SCAN_INTERVAL_SECONDS=${SCAN_INTERVAL_SECONDS:-30}
     restart: unless-stopped
     # networks:
     #   - homelab

@@ -239,11 +239,17 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         session.add(exp)
         session.flush()
         added["experiments"] += 1
-    elif mass is not None:
-        # Update mass if we now found it (even if it had a value before)
-        # This fixes rescans after enabling inner folder search
-        if exp.mass != mass:
+    else:
+        changed = False
+        for attr, key in [("notes", "notes"), ("exp_date", "date"), ("orientation", "orientation")]:
+            val = meta.get(key)
+            if val is not None and getattr(exp, attr) != val:
+                setattr(exp, attr, val)
+                changed = True
+        if mass is not None and exp.mass != mass:
             exp.mass = mass
+            changed = True
+        if changed:
             session.add(exp)
 
     for f in _collect_files(folder):
@@ -318,6 +324,29 @@ def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: b
             _scan_dir(session, sub, added, within_measurement=within_measurement)
 
 
+def purge_orphans(session: Session) -> dict:
+    """Remove DB records for files/experiments whose paths no longer exist on disk.
+
+    Does NOT delete Sample records — samples may exist without measurements
+    (user-created manually). Returns counts of removed rows.
+    """
+    removed = {"files": 0, "experiments": 0}
+
+    for df in session.exec(select(DataFile)).all():
+        if not (DATA_DIR / df.path).exists():
+            session.delete(df)
+            removed["files"] += 1
+    session.flush()
+
+    for exp in session.exec(select(Experiment)).all():
+        if exp.source_path and not Path(exp.source_path).exists():
+            session.delete(exp)
+            removed["experiments"] += 1
+
+    session.commit()
+    return removed
+
+
 def scan(session: Session, root_paths: Optional[list[Path]] = None) -> dict:
     """Scan root_paths and upsert all measurements into DB.
 
@@ -334,4 +363,5 @@ def scan(session: Session, root_paths: Optional[list[Path]] = None) -> dict:
             _scan_dir(session, root, added)
 
     session.commit()
-    return added
+    removed = purge_orphans(session)
+    return {**added, "removed_files": removed["files"], "removed_experiments": removed["experiments"]}

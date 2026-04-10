@@ -6,7 +6,9 @@ import hashlib
 import shutil
 import re
 import time
+import asyncio
 import yaml
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +29,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 from sqlalchemy import text
 
-from database import create_db, get_session
+from database import create_db, get_session, engine
 from datetime import datetime, timezone
 from models import (
     Sample,
@@ -49,7 +51,41 @@ from models import (
 )
 import scanner
 
-app = FastAPI(title="Lab Notebook")
+SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL_SECONDS", "30"))
+_last_scan: dict = {}
+_last_scan_at: float = 0.0
+
+
+async def _bg_scan_loop():
+    global _last_scan, _last_scan_at
+    while True:
+        await asyncio.sleep(SCAN_INTERVAL)
+        try:
+            with Session(engine) as s:
+                _last_scan = scanner.scan(s, _get_scan_roots())
+                _last_scan_at = time.time()
+        except Exception as e:
+            print(f"[bg-scan] {e}", flush=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db()
+    _migrate_notes_table()
+    _migrate_datafile_table()
+    _seed_if_empty()
+    with Session(engine) as s:
+        _sync_all_notes_from_db(s)
+    task = asyncio.create_task(_bg_scan_loop())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(title="Lab Notebook", lifespan=lifespan)
 
 DATA_DIR_PATH = Path(os.environ.get("DATA_DIR", "/data"))
 NOTES_DIR = DATA_DIR_PATH / "notes"
@@ -176,7 +212,6 @@ def auth_logout(response: Response):
 
 def _migrate_notes_table() -> None:
     """Add new columns to the note table if they don't exist yet."""
-    from database import engine
     new_cols = {
         "note_type": "VARCHAR DEFAULT 'discussion'",
         "tags": "VARCHAR",
@@ -195,7 +230,6 @@ def _migrate_notes_table() -> None:
 
 def _migrate_datafile_table() -> None:
     """Add auto_mode column to datafile table and backfill existing PPMS rows."""
-    from database import engine
     with engine.connect() as conn:
         existing = {row[1] for row in conn.execute(text("PRAGMA table_info(datafile)"))}
         if "auto_mode" not in existing:
@@ -228,18 +262,6 @@ def _migrate_datafile_table() -> None:
             session.commit()
 
 
-@app.on_event("startup")
-def on_startup():
-    create_db()
-    _migrate_notes_table()
-    _migrate_datafile_table()
-    _seed_if_empty()
-    # Sync all existing notes to markdown files
-    from database import engine
-    with Session(engine) as session:
-        _sync_all_notes_from_db(session)
-
-
 def _seed_if_empty():
     """On first start, copy seed samples into DATA_DIR/samples/ and scan."""
     samples_dir = DATA_DIR_PATH / "samples"
@@ -260,9 +282,6 @@ def _seed_if_empty():
             shutil.copytree(seed_sample, dest)
 
     # Run initial scan
-    from sqlmodel import Session
-    from database import engine
-
     with Session(engine) as session:
         scanner.scan(session, _get_scan_roots())
 
@@ -875,6 +894,16 @@ async def scan_uploaded_folder(
 
     result = scanner.scan(session, [target_dir])
     return result
+
+
+@app.get("/api/scan/status")
+def scan_status():
+    """Return the result and timestamp of the last background scan."""
+    return {
+        "last_scan_iso": datetime.fromtimestamp(_last_scan_at, tz=timezone.utc).isoformat()
+                         if _last_scan_at else None,
+        **_last_scan,
+    }
 
 
 # ── Filter options ─────────────────────────────────────────────────────────

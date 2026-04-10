@@ -8,7 +8,35 @@ const inv = { samples: [], current: null };
 async function invInit() {
   await invLoadFilters();
   await invLoadSamples();
+  invPollScanStatus();
 }
+
+let _invScanPollTimer = null;
+let _invLastScanAt = null;
+
+async function invPollScanStatus() {
+  clearTimeout(_invScanPollTimer);
+  try {
+    const r = await api("/api/scan/status");
+    const ts = document.getElementById("inv-sync-time");
+    if (r.last_scan_iso) {
+      const ago = Math.round((Date.now() - new Date(r.last_scan_iso)) / 1000);
+      ts.textContent = `synced ${ago}s ago`;
+      // Reload if this is a new scan result that added or removed something
+      if (_invLastScanAt && r.last_scan_iso !== _invLastScanAt) {
+        const changed = (r.removed_files ?? 0) + (r.removed_experiments ?? 0) + (r.files ?? 0) + (r.samples ?? 0);
+        if (changed > 0) {
+          await invLoadFilters();
+          await invLoadSamples();
+          if (inv.current) await invSelectSample(inv.current.id).catch(() => {});
+        }
+      }
+      _invLastScanAt = r.last_scan_iso;
+    }
+  } catch (_) {}
+  _invScanPollTimer = setTimeout(invPollScanStatus, 35000);
+}
+
 
 async function invLoadFilters() {
   try {
@@ -400,10 +428,12 @@ async function triggerScan() {
   st.textContent = "Scanning…";
   try {
     const r = await api("/api/scan", { method: "POST" });
-    st.textContent = `+${r.samples}s +${r.experiments}e +${r.files}f`;
+    const removed = (r.removed_files ?? 0) + (r.removed_experiments ?? 0);
+    st.textContent = `+${r.samples}s +${r.experiments}e +${r.files}f` +
+                     (removed > 0 ? ` -${removed} orphans` : "");
     await invLoadFilters();
     await invLoadSamples();
-    if (inv.current) await invSelectSample(inv.current.id);
+    if (inv.current) await invSelectSample(inv.current.id).catch(() => {});
   } catch (e) { st.textContent = "Error"; }
 }
 
@@ -423,8 +453,8 @@ async function importFolder() {
       st.textContent = `+${r.samples}s +${r.experiments}e +${r.files}f`;
       await invLoadFilters();
       await invLoadSamples();
-      if (inv.current) await invSelectSample(inv.current.id);
-    } catch (e) { st.textContent = "Error"; }
+      if (inv.current) await invSelectSample(inv.current.id).catch(() => {});
+      } catch (e) { st.textContent = "Error"; }
   };
   input.click();
 }
