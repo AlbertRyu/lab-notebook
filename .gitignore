@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.db
 .env
+docker-compose.override.yml
 .claude/
 example_data/
 

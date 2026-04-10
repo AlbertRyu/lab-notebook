@@ -5,8 +5,7 @@ services:
     ports:
       - "8100:8000"
     volumes:
-      - ${DATA_DIR:-./data}:/data
-      - ./frontend:/app/frontend # hot-reload HTML without rebuild
+      - ./frontend:/app/frontend
     environment:
       - LAB_NOTEBOOK_PASSWORD=${LAB_NOTEBOOK_PASSWORD:-change-me}
       - AUTH_SECRET=${AUTH_SECRET:-change-this-secret}
@@ -14,9 +13,3 @@ services:
       - AUTH_TTL_SECONDS=${AUTH_TTL_SECONDS:-28800}
       - SCAN_INTERVAL_SECONDS=${SCAN_INTERVAL_SECONDS:-30}
     restart: unless-stopped
-    # networks:
-    #   - homelab
-
-# networks:
-#   homelab:
-#     external: true

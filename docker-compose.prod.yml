@@ -1,0 +1,10 @@
+services:
+  lab-notebook:
+    volumes:
+      - ${DATA_DIR}:/data
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true
