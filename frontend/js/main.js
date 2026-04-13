@@ -59,6 +59,7 @@ function applyAuthUi() {
     "notes-add-btn", "note-save-btn", "note-pin-btn", "note-delete-btn",
     "note-title-input", "note-body",
     "bx-add-btn",
+    "stk-add-btn",
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.disabled = !auth.authenticated;
@@ -146,6 +147,7 @@ function showPage(name) {
   }
   if (name === "notes" && !_notesLoaded) notesInit();
   if (name === "boxes" && !_bxLoaded) bxInit();
+  if (name === "stock" && !_stkLoaded) stkInit();
   if (name === "overview") ovShow();
 }
 
@@ -264,7 +266,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "notes", "graph"];
+  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "notes", "graph", "stock"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))

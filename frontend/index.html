@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/static/css/notes.css" />
     <link rel="stylesheet" href="/static/css/graph.css" />
     <link rel="stylesheet" href="/static/css/boxes.css" />
+    <link rel="stylesheet" href="/static/css/stock.css" />
 
     <!-- Third-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
@@ -27,13 +28,14 @@
       <!-- ── Left nav ── -->
       <nav id="nav">
         <div class="nav-logo">🧪</div>
-        <button class="nav-btn active" id="nav-overview"   title="Overview"              onclick="showPage('overview')">🏠<span class="nav-label">Overview</span></button>
-        <button class="nav-btn"        id="nav-boxes"      title="Box Overview"           onclick="showPage('boxes')">📦<span class="nav-label">Boxes</span></button>
-        <button class="nav-btn"        id="nav-preparations" title="Preparations"         onclick="showPage('preparations')">🧭<span class="nav-label">Preparations</span></button>
-        <button class="nav-btn"        id="nav-inventory"  title="Sample Inventory"       onclick="showPage('inventory')">📋<span class="nav-label">Inventory</span></button>
-        <button class="nav-btn"        id="nav-viz"        title="Data Visualization"     onclick="showPage('viz')">📈<span class="nav-label">Visualization</span></button>
-        <button class="nav-btn"        id="nav-notes"      title="Notes"                  onclick="showPage('notes')">📝<span class="nav-label">Notes</span></button>
-        <button class="nav-btn"        id="nav-graph"      title="Entity Graph"           onclick="showPage('graph')">🕸️<span class="nav-label">Entity Graph</span></button>
+        <button class="nav-btn active" id="nav-overview"      title="Overview"          onclick="showPage('overview')">🏠<span class="nav-label">Overview</span></button>
+        <button class="nav-btn"        id="nav-stock"         title="Crystal Stock"      onclick="showPage('stock')">🫙<span class="nav-label">Crystal Stock</span></button>
+        <button class="nav-btn"        id="nav-preparations"  title="Measurement Queue"  onclick="showPage('preparations')">🧭<span class="nav-label">Queue</span></button>
+        <button class="nav-btn"        id="nav-inventory"     title="Sample Registry"    onclick="showPage('inventory')">📋<span class="nav-label">Samples</span></button>
+        <button class="nav-btn"        id="nav-boxes"         title="Sample Boxes"       onclick="showPage('boxes')">📦<span class="nav-label">Sample Boxes</span></button>
+        <button class="nav-btn"        id="nav-viz"           title="Data Visualization" onclick="showPage('viz')">📈<span class="nav-label">Visualization</span></button>
+        <button class="nav-btn"        id="nav-notes"         title="Notes"              onclick="showPage('notes')">📝<span class="nav-label">Notes</span></button>
+        <button class="nav-btn"        id="nav-graph"         title="Entity Graph"       onclick="showPage('graph')">🕸️<span class="nav-label">Entity Graph</span></button>
         <div class="spacer"></div>
         <button class="nav-btn nav-toggle" title="Expand sidebar" onclick="toggleNav()">›</button>
         <div class="nav-bottom">
@@ -76,6 +78,7 @@
     <script src="/static/js/notes.js"></script>
     <script src="/static/js/graph.js"></script>
     <script src="/static/js/boxes.js"></script>
+    <script src="/static/js/stock.js"></script>
     <script src="/static/js/main.js"></script>
   </body>
 </html>

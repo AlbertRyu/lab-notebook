@@ -1,3 +1,4 @@
+import io
 import os
 import json
 import hmac
@@ -8,6 +9,11 @@ import re
 import time
 import asyncio
 import yaml
+
+import pillow_heif
+from PIL import Image
+
+pillow_heif.register_heif_opener()
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -90,6 +96,21 @@ app = FastAPI(title="Lab Notebook", lifespan=lifespan)
 DATA_DIR_PATH = Path(os.environ.get("DATA_DIR", "/data"))
 NOTES_DIR = DATA_DIR_PATH / "notes"
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+
+
+_HEIC_EXTENSIONS = {".heic", ".heif"}
+
+
+def _normalise_image(data: bytes, filename: str) -> tuple[bytes, str]:
+    """Convert HEIC/HEIF images to JPEG so all browsers can display them.
+    All other formats are returned unchanged."""
+    if Path(filename).suffix.lower() in _HEIC_EXTENSIONS:
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        filename = Path(filename).stem + ".jpg"
+        return buf.getvalue(), filename
+    return data, filename
 
 
 def _get_scan_roots() -> list[Path]:
@@ -377,6 +398,63 @@ def list_boxes(session: Session = Depends(get_session)):
     ]
 
 
+# ── Stock config (JSON file on disk) ──────────────────────────────────────
+
+STOCK_CONFIG_PATH = DATA_DIR_PATH / "stock_config.json"
+STOCK_PHOTOS_DIR = DATA_DIR_PATH / "stock"
+
+
+@app.get("/api/stock-config")
+def get_stock_config():
+    if STOCK_CONFIG_PATH.exists():
+        try:
+            return json.loads(STOCK_CONFIG_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"bottles": []}
+
+
+@app.post("/api/stock-config")
+async def save_stock_config(request: Request):
+    require_write_auth(request)
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Expected a JSON object")
+    STOCK_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STOCK_CONFIG_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return {"ok": True}
+
+
+@app.post("/api/stock/photo")
+async def upload_stock_photo(
+    file: UploadFile = FastAPIFile(...),
+    _: None = Depends(require_write_auth),
+):
+    STOCK_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time() * 1000)
+    raw_name = file.filename or "photo"
+    data, converted_name = _normalise_image(await file.read(), raw_name)
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", converted_name)
+    filename = f"{ts}_{safe_name}"
+    (STOCK_PHOTOS_DIR / filename).write_bytes(data)
+    return {"filename": filename}
+
+
+@app.delete("/api/stock/photo/{filename}", status_code=204)
+def delete_stock_photo(
+    filename: str,
+    _: None = Depends(require_write_auth),
+):
+    safe_name = Path(filename).name
+    photo_path = STOCK_PHOTOS_DIR / safe_name
+    try:
+        photo_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 # ── Static files ───────────────────────────────────────────────────────────
 
 app.mount("/files", StaticFiles(directory=str(DATA_DIR_PATH)), name="files")
@@ -583,10 +661,11 @@ async def upload_sample_file(
         raise HTTPException(404, "Sample not found")
     save_dir = DATA_DIR_PATH / "samples" / sample.compound / sample.name / "photos"
     save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir / file.filename
-    save_path.write_bytes(await file.read())
+    data, filename = _normalise_image(await file.read(), file.filename)
+    save_path = save_dir / filename
+    save_path.write_bytes(data)
     rel_path = save_path.relative_to(DATA_DIR_PATH).as_posix()
-    sf = SampleFile(sample_id=sample_id, filename=file.filename, path=rel_path)
+    sf = SampleFile(sample_id=sample_id, filename=filename, path=rel_path)
     session.add(sf)
     session.commit()
     session.refresh(sf)
