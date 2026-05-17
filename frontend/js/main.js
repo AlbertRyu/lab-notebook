@@ -55,7 +55,7 @@ function applyAuthUi() {
   [
     "inv-add-sample-btn", "inv-scan-btn", "inv-import-btn",
     "detail-add-exp-btn", "detail-edit-sample-btn", "detail-delete-sample-btn",
-    "prep-add-sample-btn", "prep-detail-edit-btn", "prep-detail-delete-btn",
+    "prep-add-sample-btn", "prep-detail-add-exp-btn", "prep-detail-edit-btn", "prep-detail-delete-btn",
     "notes-add-btn", "note-save-btn", "note-pin-btn", "note-delete-btn",
     "note-title-input", "note-body",
     "bx-add-btn",

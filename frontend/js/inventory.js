@@ -593,6 +593,15 @@ function openEditSample() {
 function openAddExperiment() {
   if (!ensureWriteAuth()) return;
   const s = inv.current;
+  if (!s) return;
+  openAddExperimentModal(s, async () => {
+    closeModal();
+    await invSelectSample(s.id);
+  });
+}
+
+function openAddExperimentModal(sample, onCreated) {
+  if (!sample) return;
   modalOpen("Add Experiment", `
     <div class="form-row"><label>Type *</label>
       <select id="f-exp-type" onchange="invToggleOrientationField()">
@@ -629,7 +638,7 @@ function openAddExperiment() {
     const isPpms = type === "ppms-vsm" || type === "ppms-hc";
     const rawMass = isPpms ? document.getElementById("f-exp-mass").value.trim() : "";
     const payload = {
-      sample_id: s.id,
+      sample_id: sample.id,
       type,
       exp_date:    document.getElementById("f-exp-date").value  || null,
       notes:       document.getElementById("f-exp-notes").value.trim() || null,
@@ -637,9 +646,9 @@ function openAddExperiment() {
       mass: rawMass === "" ? null : parseFloat(rawMass),
     };
     await api("/api/experiments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    closeModal();
-    await invSelectSample(s.id);
+    if (onCreated) await onCreated(payload);
   });
+  invToggleOrientationField();
 }
 
 function invToggleOrientationField() {

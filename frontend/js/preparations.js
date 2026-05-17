@@ -90,6 +90,13 @@ function prepRenderDetail() {
   prepRenderSamplePhotos(s);
 }
 
+function prepResetDetail() {
+  prep.current = null;
+  document.getElementById("prep-detail-view").style.display = "none";
+  document.getElementById("prep-detail-placeholder").style.display = "flex";
+  prepRenderList();
+}
+
 function prepRenderSamplePhotos(s) {
   const el    = document.getElementById("prep-sample-photos");
   const files = s.sample_files || [];
@@ -185,12 +192,9 @@ async function prepDeleteSample() {
   if (!prep.current) return;
   if (!confirm(`Delete sample "${prep.current.name}"?\n\nThis cannot be undone.`)) return;
   await api(`/api/samples/${prep.current.id}`, { method: "DELETE" });
-  prep.current = null;
   await prepLoadFilters();
   await prepLoadSamples();
-  // Reset detail view
-  document.getElementById("prep-detail-view").style.display = "none";
-  document.getElementById("prep-detail-placeholder").style.display = "flex";
+  prepResetDetail();
 }
 
 function prepOpenEditSample() {
@@ -217,5 +221,23 @@ function prepOpenEditSample() {
     closeModal();
     await prepLoadSamples();
     await prepSelectSample(s.id);
+  });
+}
+
+function prepOpenAddExperiment() {
+  if (!ensureWriteAuth()) return;
+  const s = prep.current;
+  if (!s) return;
+  openAddExperimentModal(s, async () => {
+    closeModal();
+    prepResetDetail();
+    await Promise.all([
+      prepLoadFilters(),
+      prepLoadSamples(),
+      invLoadFilters(),
+      invLoadSamples(),
+    ]);
+    showPage("inventory");
+    await invSelectSample(s.id);
   });
 }
