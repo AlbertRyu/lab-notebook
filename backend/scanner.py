@@ -206,6 +206,34 @@ def _upsert_sample(session: Session, meta: dict, added: dict) -> Sample:
     return sample
 
 
+def _sample_from_existing_path(session: Session, folder: Path) -> Optional[Sample]:
+    """Prefer an already-known sample encoded in the folder path.
+
+    Expected layout under DATA_DIR/samples is roughly:
+      /samples/<compound>/<sample>/<type>/[orientation]
+    If one of the ancestors already matches a known sample name, reuse it instead
+    of trusting a PPMS header that may only contain the compound name.
+    """
+    try:
+        relative_parts = folder.resolve().relative_to(SAMPLES_DIR.resolve()).parts
+    except ValueError:
+        return None
+
+    if len(relative_parts) < 2:
+        return None
+
+    candidates = [relative_parts[-3], relative_parts[-2]] if len(relative_parts) >= 3 else [relative_parts[-2]]
+    seen = set()
+    for name in candidates:
+        if name in seen:
+            continue
+        seen.add(name)
+        sample = session.exec(select(Sample).where(Sample.name == name)).first()
+        if sample is not None:
+            return sample
+    return None
+
+
 def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict):
     """Create/update Sample + Experiment + DataFiles for a measurement folder."""
     sample_name = (meta.get("sample") or "").strip()
@@ -214,7 +242,9 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         return
 
     source_path = str(folder.resolve())
-    sample = _upsert_sample(session, meta, added)
+    sample = _sample_from_existing_path(session, folder)
+    if sample is None:
+        sample = _upsert_sample(session, meta, added)
 
     exp = session.exec(
         select(Experiment).where(Experiment.source_path == source_path)
@@ -241,6 +271,9 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         added["experiments"] += 1
     else:
         changed = False
+        if exp.sample_id != sample.id:
+            exp.sample_id = sample.id
+            changed = True
         for attr, key in [("notes", "notes"), ("exp_date", "date"), ("orientation", "orientation")]:
             val = meta.get(key)
             if val is not None and getattr(exp, attr) != val:
