@@ -434,7 +434,10 @@ async function triggerScan() {
     await invLoadFilters();
     await invLoadSamples();
     if (inv.current) await invSelectSample(inv.current.id).catch(() => {});
-  } catch (e) { st.textContent = "Error"; }
+  } catch (e) {
+    console.error("Scan failed:", e);
+    st.textContent = `Error: ${e.message || "Unknown error"}`;
+  }
 }
 
 async function importFolder() {
@@ -454,7 +457,10 @@ async function importFolder() {
       await invLoadFilters();
       await invLoadSamples();
       if (inv.current) await invSelectSample(inv.current.id).catch(() => {});
-      } catch (e) { st.textContent = "Error"; }
+    } catch (e) {
+      console.error("Folder import failed:", e);
+      st.textContent = `Error: ${e.message || "Unknown error"}`;
+    }
   };
   input.click();
 }

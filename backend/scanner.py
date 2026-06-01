@@ -30,13 +30,14 @@ from typing import Optional
 import yaml
 from sqlmodel import Session, select
 
-from models import Sample, Experiment, DataFile
+from models import Sample, Experiment, DataFile, SampleFile
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 SAMPLES_DIR = DATA_DIR / "samples"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"}
 DATA_EXTS = {".dat", ".xy", ".xye", ".csv", ".txt", ".asc"}
+PHOTO_DIR_NAMES = {"photos", "images", "picture", "samplepic"}
 
 
 def _file_type(path: Path) -> str:
@@ -57,6 +58,35 @@ def _read_meta_yaml(folder: Path) -> Optional[dict]:
         return yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
     except Exception:
         return {}
+
+
+def _normalise_sample_name(name: str) -> str:
+    return "".join(ch.lower() for ch in name if ch.isalnum())
+
+
+def _sample_by_name(session: Session, name: str) -> Optional[Sample]:
+    sample = session.exec(select(Sample).where(Sample.name == name)).first()
+    if sample is not None:
+        return sample
+
+    normalised = _normalise_sample_name(name)
+    if not normalised:
+        return None
+    for sample in session.exec(select(Sample)).all():
+        if _normalise_sample_name(sample.name) == normalised:
+            return sample
+    return None
+
+
+def is_sample_photo_path(path: str) -> bool:
+    parts = [p.lower() for p in Path(path).parts]
+    if "samples" in parts:
+        sample_root = parts.index("samples")
+        photo_dir_index = sample_root + 3
+        return len(parts) > photo_dir_index and parts[photo_dir_index] in PHOTO_DIR_NAMES
+
+    measurement_dirs = {"ppms-vsm", "ppms-hc", "pxrd", "sxrd", "fmr", "microscopy", "oop", "ip", "graphs"}
+    return not any(part in measurement_dirs for part in parts)
 
 
 def _extract_ppms_meta(folder: Path) -> Optional[dict]:
@@ -228,10 +258,10 @@ def _sample_from_existing_path(session: Session, folder: Path) -> Optional[Sampl
         if name in seen:
             continue
         seen.add(name)
-        sample = session.exec(select(Sample).where(Sample.name == name)).first()
+        sample = _sample_by_name(session, name)
         if sample is not None:
             return sample
-    return None
+    return _sample_by_name(session, folder.name)
 
 
 def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict):
@@ -319,6 +349,71 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
         added["files"] += 1
 
 
+def _import_sample_images(
+    session: Session,
+    sample: Sample,
+    image_files: list[Path],
+    base_folder: Path,
+    added: dict,
+) -> None:
+    for f in image_files:
+        try:
+            rel_path = f.relative_to(DATA_DIR).as_posix()
+        except ValueError:
+            rel_path = str(f)
+
+        if session.exec(select(SampleFile).where(SampleFile.path == rel_path)).first():
+            continue
+
+        try:
+            filename = f.relative_to(base_folder).as_posix()
+        except ValueError:
+            filename = f.name
+
+        session.add(SampleFile(
+            sample_id=sample.id,
+            filename=filename,
+            path=rel_path,
+            file_type="image",
+        ))
+        added["files"] += 1
+
+
+def _scan_sample_photos(session: Session, folder: Path, added: dict) -> bool:
+    """Import image files from sample-level photo folders or queue sample folders."""
+    is_photo_dir = folder.name.lower() in PHOTO_DIR_NAMES
+    sample = _sample_from_existing_path(session, folder)
+
+    if is_photo_dir:
+        if sample is None:
+            return False
+        image_files = [
+            f for f in sorted(folder.rglob("*"))
+            if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in IMAGE_EXTS
+        ]
+        _import_sample_images(session, sample, image_files, folder, added)
+        return True
+
+    try:
+        folder.resolve().relative_to(SAMPLES_DIR.resolve())
+        is_under_samples_dir = True
+    except ValueError:
+        is_under_samples_dir = False
+    if is_under_samples_dir:
+        return False
+
+    sample = sample or _sample_by_name(session, folder.name)
+    if sample is None:
+        return False
+
+    image_files = [
+        f for f in sorted(folder.iterdir())
+        if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in IMAGE_EXTS
+    ]
+    _import_sample_images(session, sample, image_files, folder, added)
+    return False
+
+
 def _merge_meta(ppms: dict, yaml: dict) -> dict:
     """Merge PPMS header metadata with meta.yaml. yaml wins on conflict."""
     merged = {**ppms}
@@ -336,6 +431,9 @@ def _scan_dir(session: Session, folder: Path, added: dict, within_measurement: b
     meta.yaml is always read regardless.
     """
     if not folder.is_dir() or folder.name.startswith("."):
+        return
+
+    if not within_measurement and _scan_sample_photos(session, folder, added):
         return
 
     yaml_meta = _read_meta_yaml(folder) or {}
@@ -371,8 +469,20 @@ def purge_orphans(session: Session) -> dict:
             removed["files"] += 1
     session.flush()
 
+    for sf in session.exec(select(SampleFile)).all():
+        is_measurement_file = session.exec(
+            select(DataFile).where(DataFile.path == sf.path)
+        ).first() is not None
+        if is_measurement_file or not is_sample_photo_path(sf.path) or not (DATA_DIR / sf.path).exists():
+            session.delete(sf)
+            removed["files"] += 1
+    session.flush()
+
     for exp in session.exec(select(Experiment)).all():
         if exp.source_path and not Path(exp.source_path).exists():
+            for df in session.exec(select(DataFile).where(DataFile.experiment_id == exp.id)).all():
+                session.delete(df)
+                removed["files"] += 1
             session.delete(exp)
             removed["experiments"] += 1
 

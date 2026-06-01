@@ -506,10 +506,12 @@ def get_sample(sample_id: int, session: Session = Depends(get_session)):
         select(Experiment).where(Experiment.sample_id == sample_id)
     ).all()
     exp_reads = []
+    measurement_paths = set()
     for exp in experiments:
         files = session.exec(
             select(DataFile).where(DataFile.experiment_id == exp.id)
         ).all()
+        measurement_paths.update(f.path for f in files)
         exp_reads.append(
             ExperimentRead(
                 id=exp.id,
@@ -530,6 +532,10 @@ def get_sample(sample_id: int, session: Session = Depends(get_session)):
     sfiles = session.exec(
         select(SampleFile).where(SampleFile.sample_id == sample_id)
     ).all()
+    sfiles = [
+        f for f in sfiles
+        if f.path not in measurement_paths and scanner.is_sample_photo_path(f.path)
+    ]
     return SampleDetail(
         id=sample.id,
         name=sample.name,
