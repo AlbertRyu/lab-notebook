@@ -22,7 +22,7 @@
 
 #viz-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 #viz-table col.c-sel  { width: 30px; }
-#viz-table col.c-mode { width: 96px; }
+#viz-table col.c-mode { width: 124px; }
 #viz-table th {
   background: var(--bg-header);
   padding: 5px 7px;
@@ -67,7 +67,7 @@
 #viz-status.busy::before  { background: #f59e0b; }
 #viz-status.error::before { background: #ef4444; }
 
-.mode-group { display: flex; gap: 6px; align-items: center; }
+.mode-group { display: flex; gap: 5px; align-items: center; }
 .mode-group label { display: flex; align-items: center; gap: 2px; font-size: 11px; cursor: pointer; color: var(--fg-dim); }
 .mode-group label:has(input:checked) { color: var(--accent); font-weight: 600; }
 .mode-group input[type="radio"] { accent-color: var(--accent); cursor: pointer; }

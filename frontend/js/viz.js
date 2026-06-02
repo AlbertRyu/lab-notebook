@@ -124,10 +124,15 @@ function vizRenderTable() {
     const expType = document.getElementById("viz-exp-type").value;
     const isPpms  = expType.startsWith("ppms");
     const isHC    = expType === "ppms-hc";
+    const vsmModes = [
+      { value: "MT", label: "MT" },
+      { value: "MH", label: "MH" },
+      { value: "CHI", label: "χ(T)" },
+    ];
     const modeCtrl = isPpms && !isHC
-      ? `<div class="mode-group">${["MT", "MH"].map((m) =>
-          `<label><input type="radio" name="vm-${f.id}" value="${m}" ${viz.fileModes[f.id] === m ? "checked" : ""}
-            onchange="viz.fileModes[${f.id}]='${m}'"> ${m}</label>`
+      ? `<div class="mode-group">${vsmModes.map((m) =>
+          `<label><input type="radio" name="vm-${f.id}" value="${m.value}" ${viz.fileModes[f.id] === m.value ? "checked" : ""}
+            onchange="viz.fileModes[${f.id}]='${m.value}'"> ${m.label}</label>`
         ).join("")}</div>`
       : '<span style="color:var(--fg-muted);font-size:11px;">—</span>';
 
@@ -170,7 +175,7 @@ async function vizRenderPlot() {
 
   if (type.startsWith("ppms")) {
     const modes = new Set(ids.map((id) => viz.fileModes[id]));
-    if (modes.size > 1) { vizSetStatus("Mixed modes (MT & MH) — select one mode only.", "error"); return; }
+    if (modes.size > 1) { vizSetStatus("Mixed modes — select one mode only.", "error"); return; }
   }
 
   const mode = type.startsWith("ppms") ? viz.fileModes[ids[0]] : undefined;

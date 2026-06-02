@@ -199,11 +199,25 @@ def to_traces(df: dict, mode: str, label: str, mass: Optional[float] = None) -> 
     M = df.get("Moment (emu)", [])
 
     x, y = [], []
-    src = T if mode == "MT" else H
     # Only normalize if mass is present and mass > 0 (avoid division by zero)
     normalize = mass is not None and mass > 0
+
+    if mode == "CHI":
+        for i in range(min(len(T), len(H), len(M))):
+            if (
+                math.isfinite(T[i])
+                and math.isfinite(H[i])
+                and math.isfinite(M[i])
+                and H[i] != 0
+            ):
+                x.append(T[i])
+                moment = M[i] / mass if normalize else M[i]
+                y.append(moment / H[i])
+        return [{"x": x, "y": y, "mode": "lines", "name": label, "type": "scatter"}]
+
+    src = T if mode == "MT" else H
     for i in range(min(len(src), len(M))):
-        if src[i] == src[i] and M[i] == M[i]:  # isfinite check
+        if math.isfinite(src[i]) and math.isfinite(M[i]):
             x.append(src[i])
             if normalize:
                 y.append(M[i] / mass)

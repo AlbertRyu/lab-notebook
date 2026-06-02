@@ -868,6 +868,23 @@ def delete_experiment_file(
 # ── Visualization data ─────────────────────────────────────────────────────
 
 
+def ppms_plot_axis_titles(mode: str, has_mass: bool) -> tuple[str, str]:
+    if mode == "HC":
+        return (
+            "Temperature (K)",
+            "Specific Heat (µJ/K/mg)" if has_mass else "Heat Capacity (µJ/K)",
+        )
+    if mode == "CHI":
+        return (
+            "Temperature (K)",
+            "Susceptibility (emu/mg/Oe)" if has_mass else "Susceptibility (emu/Oe)",
+        )
+    return (
+        "Temperature (K)" if mode == "MT" else "Magnetic Field (Oe)",
+        "Moment (emu/mg)" if has_mass else "Moment (emu)",
+    )
+
+
 @app.get("/api/experiments/{exp_id}/data")
 def experiment_data(
     exp_id: int,
@@ -908,11 +925,9 @@ def experiment_data(
             m = mode or detect_mode(df)
             t = ppms_traces(df, m, f.filename, exp.mass)
             traces.extend(t)
-            xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
-            if exp.mass is not None and exp.mass > 0:
-                yaxis_title = "Moment (emu/mg)"
-            else:
-                yaxis_title = "Moment (emu)"
+            xaxis_title, yaxis_title = ppms_plot_axis_titles(
+                m, exp.mass is not None and exp.mass > 0
+            )
 
         elif exp.type in {"pxrd", "sxrd"}:
             from parsers.pxrd import parse_pxrd, to_traces as pxrd_traces
@@ -1111,12 +1126,9 @@ def plot_files(
                 continue
             m = mode or detect_mode(df)
             traces.extend(ppms_traces(df, m, f.filename, exp.mass))
-            if m == "HC":
-                xaxis_title = "Temperature (K)"
-                yaxis_title = "Specific Heat (µJ/K/mg)" if (exp.mass is not None and exp.mass > 0) else "Heat Capacity (µJ/K)"
-            else:
-                xaxis_title = "Temperature (K)" if m == "MT" else "Magnetic Field (Oe)"
-                yaxis_title = "Moment (emu/mg)" if (exp.mass is not None and exp.mass > 0) else "Moment (emu)"
+            xaxis_title, yaxis_title = ppms_plot_axis_titles(
+                m, exp.mass is not None and exp.mass > 0
+            )
 
         elif exp.type in {"pxrd", "sxrd"}:
             from parsers.pxrd import parse_pxrd, to_traces as pxrd_traces
