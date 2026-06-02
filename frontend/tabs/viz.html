@@ -8,11 +8,17 @@
         <option value="pxrd">PXRD</option>
         <option value="sxrd">SXRD</option>
       </select>
+      <select id="viz-mode-filter" onchange="vizOnFilterChange()">
+        <option value="">All modes</option>
+      </select>
+      <select id="viz-compound-filter" onchange="vizOnFilterChange()">
+        <option value="">All compounds</option>
+      </select>
       <select id="viz-sample-filter" onchange="vizOnSampleChange()">
         <option value="">All samples</option>
       </select>
-      <select id="viz-meas-filter" onchange="vizOnMeasChange()" style="display:none">
-        <option value="">All measurements</option>
+      <select id="viz-orientation-filter" onchange="vizOnFilterChange()">
+        <option value="">All orientations</option>
       </select>
     </div>
     <div id="viz-table-wrap">

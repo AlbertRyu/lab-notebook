@@ -186,6 +186,7 @@ class FileWithContext(SQLModel):
     exp_orientation: Optional[str] = None
     sample_id: int
     sample_name: str
+    sample_compound: str
     auto_mode: Optional[str] = None
     external_field_oe: Optional[float] = None
     temperature_k: Optional[float] = None

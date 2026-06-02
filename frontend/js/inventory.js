@@ -684,10 +684,9 @@ async function invGoPlotting(sampleId, expId, expType) {
   showPage("viz");
   if (_vizInitPromise) await _vizInitPromise;
   document.getElementById("viz-exp-type").value = expType;
+  await vizOnTypeChange();
   document.getElementById("viz-sample-filter").value = String(sampleId);
-  await vizOnSampleChange();
-  document.getElementById("viz-meas-filter").value = String(expId);
-  vizRenderTable();
+  vizOnSampleChange();
 }
 
 function invToggleLogSection(expId) {

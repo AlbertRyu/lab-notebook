@@ -1073,6 +1073,7 @@ def list_files(
                 exp_orientation=exp.orientation,
                 sample_id=s.id,
                 sample_name=s.name,
+                sample_compound=s.compound,
                 auto_mode=f.auto_mode,
                 external_field_oe=ppms_values.get("external_field_oe"),
                 temperature_k=ppms_values.get("temperature_k"),
