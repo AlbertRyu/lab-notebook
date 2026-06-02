@@ -1051,6 +1051,16 @@ def list_files(
     out: list[FileWithContext] = []
 
     for f, exp, s in rows:
+        ppms_values: dict = {}
+        if exp.type == "ppms-vsm":
+            try:
+                from parsers.ppms import parse_dat, diagnostic_constants
+
+                parsed = parse_dat(str(DATA_DIR_PATH / f.path))
+                ppms_values = diagnostic_constants(parsed) if parsed else {}
+            except Exception:
+                ppms_values = {}
+
         out.append(
             FileWithContext(
                 id=f.id,
@@ -1064,6 +1074,8 @@ def list_files(
                 sample_id=s.id,
                 sample_name=s.name,
                 auto_mode=f.auto_mode,
+                external_field_oe=ppms_values.get("external_field_oe"),
+                temperature_k=ppms_values.get("temperature_k"),
             )
         )
 

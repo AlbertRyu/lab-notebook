@@ -108,6 +108,28 @@ def detect_mode(df: dict) -> str:
     return "MH" if score_H > score_T else "MT"
 
 
+def _median_finite(vals: list) -> Optional[float]:
+    finite = [
+        float(v) for v in vals if isinstance(v, (int, float)) and math.isfinite(v)
+    ]
+    if not finite:
+        return None
+
+    finite.sort()
+    mid = len(finite) // 2
+    if len(finite) % 2:
+        return finite[mid]
+    return (finite[mid - 1] + finite[mid]) / 2
+
+
+def diagnostic_constants(df: dict) -> dict:
+    """Return representative fixed-axis values for PPMS VSM list labels."""
+    return {
+        "external_field_oe": _median_finite(df.get("Magnetic Field (Oe)", [])),
+        "temperature_k": _median_finite(df.get("Temperature (K)", [])),
+    }
+
+
 def extract_header_meta(path: str) -> dict:
     """Extract sample/measurement metadata from a PPMS .dat file header.
 

@@ -41,6 +41,26 @@ function vizOnMeasChange() {
   vizRenderTable();
 }
 
+function vizFormatDiagnosticValue(value, unit) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  if (unit === "Oe" || unit === "K") return `${Math.round(Number(value))} ${unit}`;
+  const rounded = Math.round(Number(value) * 1000) / 1000;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded} ${unit}`;
+}
+
+function vizFileDisplayName(f) {
+  if (f.exp_type !== "ppms-vsm" || !["MT", "MH"].includes(f.auto_mode)) return f.filename;
+  if (!f.sample_name || !f.exp_orientation) return f.filename;
+
+  const diagnosticValue = f.auto_mode === "MT"
+    ? vizFormatDiagnosticValue(f.external_field_oe, "Oe")
+    : vizFormatDiagnosticValue(f.temperature_k, "K");
+
+  return diagnosticValue
+    ? `${f.sample_name}-${f.exp_orientation}-${diagnosticValue}`
+    : f.filename;
+}
+
 async function vizLoadFiles() {
   const type = document.getElementById("viz-exp-type").value;
   const p    = new URLSearchParams({ exp_type: type });
@@ -138,7 +158,7 @@ function vizRenderTable() {
 
     return `<tr id="vrow-${f.id}" ${viz.selected.has(f.id) ? 'class="selected"' : ""}>
       <td>
-        <span class="fname">${esc(f.filename)}</span>
+        <span class="fname">${esc(vizFileDisplayName(f))}</span>
         <span class="fsample">${esc(f.sample_name)}</span>
       </td>
       <td>${modeCtrl}</td>

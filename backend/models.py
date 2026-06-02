@@ -187,3 +187,5 @@ class FileWithContext(SQLModel):
     sample_id: int
     sample_name: str
     auto_mode: Optional[str] = None
+    external_field_oe: Optional[float] = None
+    temperature_k: Optional[float] = None
