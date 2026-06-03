@@ -95,7 +95,7 @@ function vizGetFilters(exclude) {
     sample: exclude === "sample"
       ? ""
       : document.getElementById("viz-sample-filter").value,
-    orientation: exclude === "orientation"
+    measurement: exclude === "measurement"
       ? ""
       : document.getElementById("viz-orientation-filter").value,
   };
@@ -107,11 +107,57 @@ function vizFileMode(f) {
   return f.auto_mode || "";
 }
 
+function vizModeLabel(mode) {
+  return mode === "MT" ? "χ(T)" : mode;
+}
+
+function vizNumericSortValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+}
+
+function vizModeSortRank(mode) {
+  if (mode === "MT") return 0;
+  if (mode === "MH") return 1;
+  return 2;
+}
+
+function vizDiagnosticSortValue(f) {
+  const mode = vizFileMode(f);
+  if (mode === "MT") return vizNumericSortValue(f.external_field_oe);
+  if (mode === "MH") return vizNumericSortValue(f.temperature_k);
+  return Number.POSITIVE_INFINITY;
+}
+
+function vizMeasurementLabel(f) {
+  const orientation = f.exp_orientation || "No orientation";
+  const date = f.exp_date || "No date";
+  return `${orientation}-${date}`;
+}
+
+function vizSortFiles(files) {
+  return files.slice().sort((a, b) => {
+    const sampleCmp = vizNumericSortValue(a.sample_id) - vizNumericSortValue(b.sample_id);
+    if (sampleCmp) return sampleCmp;
+
+    const modeCmp = vizModeSortRank(vizFileMode(a)) - vizModeSortRank(vizFileMode(b));
+    if (modeCmp) return modeCmp;
+
+    const diagnosticCmp = vizDiagnosticSortValue(a) - vizDiagnosticSortValue(b);
+    if (diagnosticCmp) return diagnosticCmp;
+
+    const nameCmp = String(a.filename || "").localeCompare(String(b.filename || ""));
+    if (nameCmp) return nameCmp;
+
+    return vizNumericSortValue(a.id) - vizNumericSortValue(b.id);
+  });
+}
+
 function vizMatchesFilters(f, filters) {
   if (filters.mode && vizFileMode(f) !== filters.mode) return false;
   if (filters.compound && f.sample_compound !== filters.compound) return false;
   if (filters.sample && String(f.sample_id) !== filters.sample) return false;
-  if (filters.orientation && (f.exp_orientation || "") !== filters.orientation) return false;
+  if (filters.measurement && String(f.experiment_id) !== filters.measurement) return false;
   return true;
 }
 
@@ -149,9 +195,8 @@ function vizRefreshFilters() {
   for (let i = 0; i < 4; i++) {
     const modeEntries = vizModeFilterEnabled()
       ? vizUniqueOptions(vizOptionsSource("mode"), vizFileMode, (f) => {
-          const m = vizFileMode(f);
-          return m === "CHI" ? "χ(T)" : m;
-        }).filter((entry) => ["MT", "MH", "CHI"].includes(String(entry.value)))
+          return vizModeLabel(vizFileMode(f));
+        }).filter((entry) => ["MT", "MH"].includes(String(entry.value)))
       : [];
     const compoundEntries = vizUniqueOptions(
       vizOptionsSource("compound"),
@@ -163,17 +208,17 @@ function vizRefreshFilters() {
       (f) => f.sample_id,
       (f) => f.sample_name
     );
-    const orientationEntries = vizUniqueOptions(
-      vizOptionsSource("orientation"),
-      (f) => f.exp_orientation,
-      (f) => f.exp_orientation
+    const measurementEntries = vizUniqueOptions(
+      vizOptionsSource("measurement"),
+      (f) => f.experiment_id,
+      vizMeasurementLabel
     );
 
     const passChanged = [
       vizSetSelectOptions("viz-mode-filter", "All modes", modeEntries, !vizModeFilterEnabled()),
       vizSetSelectOptions("viz-compound-filter", "All compounds", compoundEntries, false),
       vizSetSelectOptions("viz-sample-filter", "All samples", sampleEntries, false),
-      vizSetSelectOptions("viz-orientation-filter", "All orientations", orientationEntries, false),
+      vizSetSelectOptions("viz-orientation-filter", "All measurements", measurementEntries, false),
     ].some(Boolean);
     changed = changed || passChanged;
     if (!passChanged) break;
@@ -183,7 +228,7 @@ function vizRefreshFilters() {
 
 function vizRenderTable() {
   const filters = vizGetFilters();
-  viz.files = viz.allFiles.filter((f) => vizMatchesFilters(f, filters));
+  viz.files = vizSortFiles(viz.allFiles.filter((f) => vizMatchesFilters(f, filters)));
   // Drop selections no longer visible
   viz.selected.forEach((id) => { if (!viz.files.find((f) => f.id === id)) viz.selected.delete(id); });
 
@@ -201,7 +246,7 @@ function vizRenderTable() {
     const isPpms = expType.startsWith("ppms");
     const mode = vizFileMode(f);
     const modeCtrl = isPpms
-      ? `<span class="mode-pill">${esc(mode === "CHI" ? "χ(T)" : mode)}</span>`
+      ? `<span class="mode-pill">${esc(vizModeLabel(mode))}</span>`
       : '<span style="color:var(--fg-muted);font-size:11px;">—</span>';
 
     return `<tr id="vrow-${f.id}" ${viz.selected.has(f.id) ? 'class="selected"' : ""}>

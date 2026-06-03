@@ -224,7 +224,7 @@ def to_traces(df: dict, mode: str, label: str, mass: Optional[float] = None) -> 
     # Only normalize if mass is present and mass > 0 (avoid division by zero)
     normalize = mass is not None and mass > 0
 
-    if mode == "CHI":
+    if mode in {"MT", "CHI"}:
         for i in range(min(len(T), len(H), len(M))):
             if (
                 math.isfinite(T[i])
@@ -237,7 +237,7 @@ def to_traces(df: dict, mode: str, label: str, mass: Optional[float] = None) -> 
                 y.append(moment / H[i])
         return [{"x": x, "y": y, "mode": "lines", "name": label, "type": "scatter"}]
 
-    src = T if mode == "MT" else H
+    src = H
     for i in range(min(len(src), len(M))):
         if math.isfinite(src[i]) and math.isfinite(M[i]):
             x.append(src[i])

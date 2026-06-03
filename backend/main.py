@@ -874,15 +874,77 @@ def ppms_plot_axis_titles(mode: str, has_mass: bool) -> tuple[str, str]:
             "Temperature (K)",
             "Specific Heat (µJ/K/mg)" if has_mass else "Heat Capacity (µJ/K)",
         )
-    if mode == "CHI":
+    if mode in {"MT", "CHI"}:
         return (
             "Temperature (K)",
             "Susceptibility (emu/mg/Oe)" if has_mass else "Susceptibility (emu/Oe)",
         )
     return (
-        "Temperature (K)" if mode == "MT" else "Magnetic Field (Oe)",
+        "Magnetic Field (Oe)",
         "Moment (emu/mg)" if has_mass else "Moment (emu)",
     )
+
+
+def _format_ppms_constant(value: Optional[float], unit: str) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    if unit in {"Oe", "K"}:
+        return f"{round(n):g} {unit}"
+    return f"{n:g} {unit}"
+
+
+def _ppms_legend_axis_value(mode: str, df: dict) -> Optional[str]:
+    from parsers.ppms import diagnostic_constants
+
+    values = diagnostic_constants(df)
+    if mode in {"MT", "CHI"}:
+        return _format_ppms_constant(values.get("external_field_oe"), "Oe")
+    if mode == "MH":
+        return _format_ppms_constant(values.get("temperature_k"), "K")
+    return None
+
+
+def _ppms_fc_zfc(mode: str, filename: str) -> Optional[str]:
+    if mode not in {"MT", "CHI"}:
+        return None
+
+    name = Path(filename).name.upper()
+    match = re.search(r"(?:^|[^A-Z0-9])(ZFC|FC)(?:[^A-Z0-9]|$)", name)
+    return match.group(1) if match else None
+
+
+def _apply_contextual_legend(traces: list[dict], contexts: list[dict]) -> str:
+    """Move shared curve context into the title and leave only differences in legend."""
+    if not traces or len(traces) != len(contexts):
+        return ""
+
+    fields = ["sample_name", "orientation", "axis_value", "fc_zfc", "exp_time"]
+    values_by_field = {
+        field: {str(ctx.get(field) or "") for ctx in contexts}
+        for field in fields
+    }
+    varying = [field for field in fields if len(values_by_field[field]) > 1]
+    shared = [
+        next(iter(values_by_field[field]))
+        for field in fields
+        if len(values_by_field[field]) == 1 and next(iter(values_by_field[field]))
+    ]
+
+    for trace, ctx in zip(traces, contexts):
+        legend_parts = [
+            str(ctx.get(field))
+            for field in varying
+            if ctx.get(field)
+        ]
+        trace["name"] = "-".join(legend_parts)
+        if not trace["name"]:
+            trace["showlegend"] = False
+
+    return "-".join(shared)
 
 
 @app.get("/api/experiments/{exp_id}/data")
@@ -910,6 +972,7 @@ def experiment_data(
         return {"traces": [], "xaxis": "", "yaxis": ""}
 
     traces = []
+    trace_contexts = []
     xaxis_title = ""
     yaxis_title = ""
 
@@ -925,6 +988,17 @@ def experiment_data(
             m = mode or detect_mode(df)
             t = ppms_traces(df, m, f.filename, exp.mass)
             traces.extend(t)
+            sample = session.get(Sample, exp.sample_id)
+            trace_contexts.extend(
+                {
+                    "sample_name": sample.name if sample else None,
+                    "orientation": exp.orientation,
+                    "axis_value": _ppms_legend_axis_value(m, df),
+                    "fc_zfc": _ppms_fc_zfc(m, f.filename),
+                    "exp_time": str(exp.exp_date) if exp.exp_date else None,
+                }
+                for _ in t
+            )
             xaxis_title, yaxis_title = ppms_plot_axis_titles(
                 m, exp.mass is not None and exp.mass > 0
             )
@@ -951,7 +1025,8 @@ def experiment_data(
             xaxis_title = keys[0] if keys else "Field"
             yaxis_title = keys[1] if len(keys) > 1 else "Signal"
 
-    return {"traces": traces, "xaxis": xaxis_title, "yaxis": yaxis_title}
+    title = _apply_contextual_legend(traces, trace_contexts)
+    return {"traces": traces, "xaxis": xaxis_title, "yaxis": yaxis_title, "title": title}
 
 
 # ── Scan ───────────────────────────────────────────────────────────────────
@@ -1094,6 +1169,7 @@ def plot_files(
 ):
     """Return Plotly traces for an arbitrary list of file IDs."""
     traces = []
+    trace_contexts = []
     xaxis_title = ""
     yaxis_title = ""
 
@@ -1116,7 +1192,7 @@ def plot_files(
 
         if not all_have and not all_missing:
             # Mixed case - collect missing and return error
-            missing = [f"{exp.name} (ID:{exp.id})" for _, exp, h in ppms_files if not h]
+            missing = [f"Experiment ID:{exp.id}" for _, exp, h in ppms_files if not h]
             raise HTTPException(
                 400,
                 f"Cannot plot mixed mass states: some measurements are missing valid sample mass. "
@@ -1138,7 +1214,19 @@ def plot_files(
             if df is None:
                 continue
             m = mode or detect_mode(df)
-            traces.extend(ppms_traces(df, m, f.filename, exp.mass))
+            t = ppms_traces(df, m, f.filename, exp.mass)
+            traces.extend(t)
+            sample = session.get(Sample, exp.sample_id)
+            trace_contexts.extend(
+                {
+                    "sample_name": sample.name if sample else None,
+                    "orientation": exp.orientation,
+                    "axis_value": _ppms_legend_axis_value(m, df),
+                    "fc_zfc": _ppms_fc_zfc(m, f.filename),
+                    "exp_time": str(exp.exp_date) if exp.exp_date else None,
+                }
+                for _ in t
+            )
             xaxis_title, yaxis_title = ppms_plot_axis_titles(
                 m, exp.mass is not None and exp.mass > 0
             )
@@ -1165,7 +1253,8 @@ def plot_files(
             xaxis_title = keys[0] if keys else "Field"
             yaxis_title = keys[1] if len(keys) > 1 else "Signal"
 
-    return {"traces": traces, "xaxis": xaxis_title, "yaxis": yaxis_title}
+    title = _apply_contextual_legend(traces, trace_contexts)
+    return {"traces": traces, "xaxis": xaxis_title, "yaxis": yaxis_title, "title": title}
 
 
 # ── Notes ──────────────────────────────────────────────────────────────────
