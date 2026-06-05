@@ -17,6 +17,32 @@
       oninput="ovSave()"
     ></textarea>
 
+    <!-- Recent measurements -->
+    <div class="ov-section-title">🧪 Recent Measurements</div>
+    <div class="ov-table-wrap">
+      <table class="ov-db-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Sample</th>
+            <th>Type</th>
+            <th>Orientation</th>
+            <th>Files</th>
+          </tr>
+        </thead>
+        <tbody id="ov-measurement-tbody">
+          <tr>
+            <td
+              colspan="5"
+              style="padding: 20px; text-align: center; color: var(--fg-muted)"
+            >
+              Loading…
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- Overview of Data Collection -->
     <div class="ov-section-title">📋 Overview of Data Collection</div>
     <div class="ov-table-wrap">
@@ -24,8 +50,8 @@
         <thead>
           <tr>
             <th rowspan="2">Chemical</th>
-            <th rowspan="2">Sample Screening</th>
-            <th rowspan="2">X-ray Diffraction</th>
+            <th rowspan="2">PXRD</th>
+            <th rowspan="2">SC-XRD</th>
             <th colspan="2">Phase Diagram Mapping</th>
           </tr>
           <tr>
@@ -203,32 +229,6 @@
         <div class="ov-chart-title">Samples by Compound</div>
         <div class="ov-chart-body" id="ov-chart-compounds"></div>
       </div>
-    </div>
-
-    <!-- Recent measurements -->
-    <div class="ov-section-title">🧪 Recent Measurements</div>
-    <div class="ov-table-wrap">
-      <table class="ov-db-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Sample</th>
-            <th>Type</th>
-            <th>Orientation</th>
-            <th>Files</th>
-          </tr>
-        </thead>
-        <tbody id="ov-measurement-tbody">
-          <tr>
-            <td
-              colspan="5"
-              style="padding: 20px; text-align: center; color: var(--fg-muted)"
-            >
-              Loading…
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
     <!-- Representative Graphs (PPMS) — dynamically rendered by overview.js -->
