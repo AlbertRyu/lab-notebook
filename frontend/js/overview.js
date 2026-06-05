@@ -28,6 +28,75 @@ function ovSave() {
   _ovSaveTimer = setTimeout(ovSaveConfig, 600);
 }
 
+function ovFormatMeasurementType(type) {
+  return String(type || "Unknown")
+    .split("-")
+    .map((part) => part.toUpperCase())
+    .join("-");
+}
+
+function ovDateSortValue(date) {
+  if (!date) return 0;
+  const ts = Date.parse(date);
+  return Number.isNaN(ts) ? 0 : ts;
+}
+
+async function ovLoadMeasurements(samples) {
+  const details = await Promise.all(
+    samples.map((sample) => api(`/api/samples/${sample.id}`).catch(() => null))
+  );
+
+  return details.flatMap((sample) => {
+    if (!sample) return [];
+    return (sample.experiments || []).map((exp) => ({
+      experiment_id: exp.id,
+      sample_id: sample.id,
+      sample_name: sample.name,
+      sample_compound: sample.compound,
+      exp_type: exp.type,
+      exp_date: exp.exp_date,
+      exp_orientation: exp.orientation,
+      file_count: exp.files?.length || 0,
+    }));
+  });
+}
+
+function ovRecentMeasurements(measurements) {
+  return measurements
+    .slice()
+    .sort((a, b) => {
+      const dateCmp = ovDateSortValue(b.exp_date) - ovDateSortValue(a.exp_date);
+      if (dateCmp) return dateCmp;
+      return (b.experiment_id || 0) - (a.experiment_id || 0);
+    })
+    .slice(0, 10);
+}
+
+function ovRenderRecentMeasurements(measurements) {
+  const tbody = document.getElementById("ov-measurement-tbody");
+  if (!tbody) return;
+
+  const recent = ovRecentMeasurements(measurements);
+  tbody.innerHTML = "";
+  if (!recent.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--fg-muted)">No measurements yet.</td></tr>';
+    return;
+  }
+
+  recent.forEach((m) => {
+    const tr = document.createElement("tr");
+    tr.onclick = () => { showPage("inventory"); invSelectSample(m.sample_id); };
+    tr.innerHTML = `
+      <td>${esc(m.exp_date || "No date")}</td>
+      <td><strong>${esc(m.sample_name)}</strong><span style="display:block;font-size:10.5px;color:var(--fg-muted);">${esc(m.sample_compound || "")}</span></td>
+      <td>${esc(ovFormatMeasurementType(m.exp_type))}</td>
+      <td>${esc(m.exp_orientation || "—")}</td>
+      <td>${m.file_count}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 // ── Live stats & charts ──────────────────────────────────────────────────
 
 async function ovLoadLive() {
@@ -36,43 +105,21 @@ async function ovLoadLive() {
     if (!sRes.ok || !fRes.ok) return;
     const samples = await sRes.json();
     const files   = await fRes.json();
+    const measurements = await ovLoadMeasurements(samples);
 
     // Stat cards
     document.getElementById("ov-stat-samples").textContent   = samples.length;
-    const expSet = new Set(files.map((f) => f.experiment_id));
-    document.getElementById("ov-stat-exps").textContent      = expSet.size;
+    document.getElementById("ov-stat-exps").textContent      = measurements.length;
     document.getElementById("ov-stat-files").textContent     = files.length;
     const cpdSet = new Set(samples.map((s) => s.compound));
     document.getElementById("ov-stat-compounds").textContent = cpdSet.size;
 
-    // Sample table
-    const tbody = document.getElementById("ov-sample-tbody");
-    if (tbody) {
-      tbody.innerHTML = "";
-      if (!samples.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--fg-muted)">No samples yet — import data from the Inventory tab.</td></tr>';
-      } else {
-        samples.forEach((s) => {
-          const tr = document.createElement("tr");
-          tr.onclick = () => { showPage("inventory"); invSelectSample(s.id); };
-          tr.innerHTML = `
-            <td><strong>${esc(s.name)}</strong></td>
-            <td>${esc(s.compound)}</td>
-            <td>${esc(s.batch || "—")}</td>
-            <td>${esc(s.box   || "—")}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
-    }
+    ovRenderRecentMeasurements(measurements);
 
     // Experiments by type
-    const byType = {}, seen = {};
-    files.forEach((f) => {
-      if (!seen[f.experiment_id]) {
-        seen[f.experiment_id] = true;
-        byType[f.exp_type] = (byType[f.exp_type] || 0) + 1;
-      }
+    const byType = {};
+    measurements.forEach((m) => {
+      byType[m.exp_type] = (byType[m.exp_type] || 0) + 1;
     });
 
     // Samples by compound
