@@ -31,6 +31,28 @@ Environment variables (see `docker-compose.yml`):
 - `AUTH_TTL_SECONDS` — cookie TTL (default 28800 = 8 hours)
 - `DATA_DIR` — data directory (default: /data)
 - `SCAN_ROOTS` — colon-separated scan directories (default: /data/samples)
+- `AUTO_SCAN_ENABLED` — run startup/background scans (default: true; prod default: false)
+- `LAB_NOTEBOOK_READ_ONLY` — reject all write APIs and keep UI read-only (default: false; prod default: true)
+
+## Remote read-only mirror
+
+Use the local instance as the only writer. For a remote display copy, run production compose with:
+
+```bash
+DATA_DIR=/home/yunxiao/lab-notebook-data
+AUTO_SCAN_ENABLED=false
+LAB_NOTEBOOK_READ_ONLY=true
+```
+
+Manually sync from the local machine with:
+
+```bash
+REMOTE_HOST=server \
+REMOTE_COMPOSE_DIR=/path/to/lab-notebook \
+scripts/sync-data-to-remote.sh
+```
+
+The script creates a SQLite `.backup` snapshot, stops the remote container, mirrors `data/` with `rsync --delete`, and starts the remote container again. Remote changes are intentionally overwritten.
 
 ## Repository layout
 

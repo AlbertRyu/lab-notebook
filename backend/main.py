@@ -57,7 +57,13 @@ from models import (
 )
 import scanner
 
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL_SECONDS", "30"))
+AUTO_SCAN_ENABLED = _env_bool("AUTO_SCAN_ENABLED", "true")
+READ_ONLY_MODE = _env_bool("LAB_NOTEBOOK_READ_ONLY", "false")
 _last_scan: dict = {}
 _last_scan_at: float = 0.0
 
@@ -76,19 +82,26 @@ async def _bg_scan_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db()
-    _migrate_notes_table()
-    _migrate_datafile_table()
-    _seed_if_empty()
-    with Session(engine) as s:
-        _sync_all_notes_from_db(s)
-    task = asyncio.create_task(_bg_scan_loop())
+    if not READ_ONLY_MODE:
+        create_db()
+        _migrate_notes_table()
+        _migrate_datafile_table()
+        if AUTO_SCAN_ENABLED:
+            _seed_if_empty()
+        with Session(engine) as s:
+            _sync_all_notes_from_db(s)
+    task = (
+        asyncio.create_task(_bg_scan_loop())
+        if AUTO_SCAN_ENABLED and not READ_ONLY_MODE
+        else None
+    )
     yield
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Lab Notebook", lifespan=lifespan)
@@ -192,6 +205,8 @@ def _is_authenticated(request: Request) -> bool:
 
 
 def require_write_auth(request: Request):
+    if READ_ONLY_MODE:
+        raise HTTPException(403, "This instance is read-only")
     if not _is_authenticated(request):
         raise HTTPException(401, "Authentication required for write operations")
 
@@ -201,11 +216,17 @@ SEED_DIR = Path(__file__).parent.parent / "seed"
 
 @app.get("/api/auth/me")
 def auth_me(request: Request):
-    return {"authenticated": _is_authenticated(request)}
+    return {
+        "authenticated": _is_authenticated(request) and not READ_ONLY_MODE,
+        "read_only": READ_ONLY_MODE,
+    }
 
 
 @app.post("/api/auth/login")
 def auth_login(data: AuthLogin, response: Response):
+    if READ_ONLY_MODE:
+        raise HTTPException(403, "This instance is read-only")
+
     configured_password = os.environ.get("LAB_NOTEBOOK_PASSWORD", "")
     if not configured_password:
         raise HTTPException(503, "LAB_NOTEBOOK_PASSWORD is not configured")

@@ -1,7 +1,10 @@
 services:
   lab-notebook:
+    environment:
+      - AUTO_SCAN_ENABLED=${AUTO_SCAN_ENABLED:-false}
+      - LAB_NOTEBOOK_READ_ONLY=${LAB_NOTEBOOK_READ_ONLY:-true}
     volumes:
-      - /data:/data
+      - ${DATA_DIR:-/data}:/data:rslave
     networks:
       - homelab
 

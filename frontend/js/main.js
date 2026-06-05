@@ -2,7 +2,7 @@
 // GLOBAL STATE & UTILS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const auth = { authenticated: false };
+const auth = { authenticated: false, readOnly: false };
 
 const savedTheme = localStorage.getItem("theme") || "light";
 document.documentElement.setAttribute("data-theme", savedTheme);
@@ -41,16 +41,21 @@ async function authInit() {
   try {
     const me = await api("/api/auth/me");
     auth.authenticated = !!me.authenticated;
+    auth.readOnly = !!me.read_only;
   } catch (_) {
     auth.authenticated = false;
+    auth.readOnly = false;
   }
   applyAuthUi();
 }
 
 function applyAuthUi() {
   const lockBtn = document.getElementById("nav-auth");
-  if (lockBtn) lockBtn.textContent = auth.authenticated ? "🔓" : "🔒";
-  document.body.classList.toggle("readonly", !auth.authenticated);
+  if (lockBtn) {
+    lockBtn.textContent = auth.readOnly ? "RO" : (auth.authenticated ? "🔓" : "🔒");
+    lockBtn.title = auth.readOnly ? "Read-only instance" : "Unlock editing";
+  }
+  document.body.classList.toggle("readonly", auth.readOnly || !auth.authenticated);
 
   [
     "inv-add-sample-btn", "inv-scan-btn", "inv-import-btn",
@@ -62,17 +67,21 @@ function applyAuthUi() {
     "stk-add-btn",
   ].forEach((id) => {
     const el = document.getElementById(id);
-    if (el) el.disabled = !auth.authenticated;
+    if (el) el.disabled = auth.readOnly || !auth.authenticated;
   });
 
   const noteTabEdit = document.getElementById("note-tab-edit");
-  if (noteTabEdit) noteTabEdit.style.display = auth.authenticated ? "" : "none";
+  if (noteTabEdit) noteTabEdit.style.display = auth.authenticated && !auth.readOnly ? "" : "none";
 
-  if (notes.current) noteSetTab(auth.authenticated ? "edit" : "preview");
+  if (notes.current) noteSetTab(auth.authenticated && !auth.readOnly ? "edit" : "preview");
   bxApplyAuth();
 }
 
 function ensureWriteAuth() {
+  if (auth.readOnly) {
+    alert("This instance is read-only. Edit on the local primary instance.");
+    return false;
+  }
   if (auth.authenticated) return true;
   alert("Read-only mode. Please unlock editing with password first.");
   openAuthModal();
@@ -80,6 +89,10 @@ function ensureWriteAuth() {
 }
 
 function openAuthModal() {
+  if (auth.readOnly) {
+    alert("This instance is read-only. Edit on the local primary instance.");
+    return;
+  }
   if (auth.authenticated) { authLogout(); return; }
   modalOpen("Unlock Editing", `
     <div class="form-row">
