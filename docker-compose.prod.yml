@@ -1,7 +1,7 @@
 services:
   lab-notebook:
     volumes:
-      - ${DATA_DIR}:/data
+      - ${DATA_DIR}:/data:ro,rslave
     networks:
       - homelab
 
