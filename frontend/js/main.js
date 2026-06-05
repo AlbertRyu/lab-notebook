@@ -163,11 +163,20 @@ document.addEventListener("keydown", (e) => {
 // SHARED — PLOTLY HELPER
 // ═══════════════════════════════════════════════════════════════════════════
 
+function plotFilenameFromTitle(title) {
+  const text = String(title || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .trim();
+  return text || "plot";
+}
+
 function drawPlotly(el, data) {
   const dark = document.documentElement.getAttribute("data-theme") === "dark";
   const bg   = dark ? "#1e1e21" : "#ffffff";
   const fg   = dark ? "#cccccc" : "#222222";
   const grid = dark ? "#444444" : "#e0e0e0";
+  const filename = plotFilenameFromTitle(data.title);
   Plotly.react(el, data.traces, {
     paper_bgcolor: bg, plot_bgcolor: bg,
     showlegend: true, uirevision: "plot-ui",
@@ -178,7 +187,13 @@ function drawPlotly(el, data) {
     yaxis: { title: data.yaxis, gridcolor: grid, linecolor: grid, zerolinecolor: grid },
     legend: { x: 1, xanchor: "right", y: 1 },
     hovermode: "closest",
-  }, { responsive: true, editable: false, displayModeBar: true, edits: { legendPosition: true } });
+  }, {
+    responsive: true,
+    editable: false,
+    displayModeBar: true,
+    edits: { legendPosition: true },
+    toImageButtonOptions: { filename },
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
