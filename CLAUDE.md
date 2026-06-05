@@ -39,7 +39,7 @@ Environment variables (see `docker-compose.yml`):
 Use the local instance as the only writer. For a remote display copy, run production compose with:
 
 ```bash
-DATA_DIR=/home/yunxiao/lab-notebook-data
+DATA_DIR=/home/yunxiao/running_projects/lab-notebook/data
 AUTO_SCAN_ENABLED=false
 LAB_NOTEBOOK_READ_ONLY=true
 ```
@@ -47,12 +47,10 @@ LAB_NOTEBOOK_READ_ONLY=true
 Manually sync from the local machine with:
 
 ```bash
-REMOTE_HOST=server \
-REMOTE_COMPOSE_DIR=/path/to/lab-notebook \
 scripts/sync-data-to-remote.sh
 ```
 
-The script creates a SQLite `.backup` snapshot, stops the remote container, mirrors `data/` with `rsync --delete`, and starts the remote container again. Remote changes are intentionally overwritten.
+The script defaults to `yunxiao@pi5vpn`, remote compose dir `/home/yunxiao/running_projects/lab-notebook`, and remote data dir `/home/yunxiao/running_projects/lab-notebook/data`. Override `REMOTE_HOST`, `REMOTE_COMPOSE_DIR`, or `REMOTE_DATA_DIR` if those change. The script creates a SQLite `.backup` snapshot, stops the remote container, mirrors `data/` with `rsync --delete`, and starts the remote container again. Remote changes are intentionally overwritten.
 
 ## Repository layout
 

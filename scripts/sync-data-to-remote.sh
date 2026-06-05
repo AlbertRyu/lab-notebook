@@ -2,23 +2,15 @@
 set -euo pipefail
 
 # Manual one-way sync for the remote read-only instance.
-# Fill these values before first use.
 REMOTE_USER="${REMOTE_USER:-yunxiao}"
-REMOTE_HOST="${REMOTE_HOST:-}"
-REMOTE_COMPOSE_DIR="${REMOTE_COMPOSE_DIR:-}"
-REMOTE_DATA_DIR="${REMOTE_DATA_DIR:-/home/yunxiao/lab-notebook-data}"
+REMOTE_HOST="${REMOTE_HOST:-pi5vpn}"
+REMOTE_COMPOSE_DIR="${REMOTE_COMPOSE_DIR:-/home/yunxiao/running_projects/lab-notebook}"
+REMOTE_DATA_DIR="${REMOTE_DATA_DIR:-$REMOTE_COMPOSE_DIR/data}"
 REMOTE_COMPOSE_CMD="${REMOTE_COMPOSE_CMD:-docker compose -f docker-compose.yml -f docker-compose.prod.yml}"
 SERVICE_NAME="${SERVICE_NAME:-lab-notebook}"
 
 LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data}"
 DB_NAME="lab_notebook.db"
-
-if [[ -z "$REMOTE_HOST" || -z "$REMOTE_COMPOSE_DIR" ]]; then
-  echo "Set REMOTE_HOST and REMOTE_COMPOSE_DIR before running." >&2
-  echo "Example:" >&2
-  echo "  REMOTE_HOST=server REMOTE_COMPOSE_DIR=/opt/lab-notebook $0" >&2
-  exit 2
-fi
 
 for cmd in rsync ssh sqlite3 mktemp; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -53,9 +45,10 @@ rsync -a --delete \
 sqlite3 "$LOCAL_DATA_DIR/$DB_NAME" ".backup '$SNAPSHOT_DIR/$DB_NAME'"
 
 REMOTE="${REMOTE_USER}@${REMOTE_HOST}"
+REMOTE_COMPOSE_ENV="DATA_DIR='$REMOTE_DATA_DIR' AUTO_SCAN_ENABLED=false LAB_NOTEBOOK_READ_ONLY=true"
 
 echo "Stopping remote container..."
-ssh "$REMOTE" "cd '$REMOTE_COMPOSE_DIR' && $REMOTE_COMPOSE_CMD stop '$SERVICE_NAME'"
+ssh "$REMOTE" "cd '$REMOTE_COMPOSE_DIR' && $REMOTE_COMPOSE_ENV $REMOTE_COMPOSE_CMD stop '$SERVICE_NAME'"
 
 echo "Ensuring remote data directory exists..."
 ssh "$REMOTE" "mkdir -p '$REMOTE_DATA_DIR'"
@@ -64,6 +57,6 @@ echo "Syncing snapshot to remote..."
 rsync -az --delete --delay-updates "$SNAPSHOT_DIR"/ "$REMOTE:$REMOTE_DATA_DIR"/
 
 echo "Starting remote container..."
-ssh "$REMOTE" "cd '$REMOTE_COMPOSE_DIR' && $REMOTE_COMPOSE_CMD up -d '$SERVICE_NAME'"
+ssh "$REMOTE" "cd '$REMOTE_COMPOSE_DIR' && $REMOTE_COMPOSE_ENV $REMOTE_COMPOSE_CMD up -d '$SERVICE_NAME'"
 
 echo "Done."
