@@ -212,50 +212,6 @@
 .ov-db-table tr:last-child td { border-bottom: none; }
 .ov-db-table tbody tr:hover td { background: var(--row-hover); cursor: pointer; }
 
-/* Goals table */
-#ov-goals-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-#ov-goals-table th {
-  background: var(--bg-panel);
-  color: var(--fg-muted);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 6px 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-#ov-goals-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
-#ov-goals-table tr:last-child td { border-bottom: none; }
-.ov-goal-inp {
-  border: none;
-  background: transparent;
-  color: var(--fg);
-  font-size: 12px;
-  font-family: inherit;
-  outline: none;
-  width: 100%;
-  padding: 3px 4px;
-  border-radius: 3px;
-}
-.ov-goal-inp:focus { background: var(--row-selected); }
-.ov-goal-sel {
-  border: none;
-  background: transparent;
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  width: 100%;
-  outline: none;
-}
-.ov-goal-sel:focus { background: var(--row-selected); }
-.ov-goal-del { opacity: 0; color: var(--danger); cursor: pointer; font-size: 13px; border: none; background: none; padding: 2px 5px; line-height: 1; }
-#ov-goals-table tr:hover .ov-goal-del { opacity: 0.5; }
-#ov-goals-table tr:hover .ov-goal-del:hover { opacity: 1; }
-#ov-add-goal { font-size: 11.5px; margin-top: 8px; }
-
 /* ── PPMS Representative Graphs ─────────────────────────────────────────── */
 
 /* Shared image grid primitives */

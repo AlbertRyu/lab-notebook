@@ -28,66 +28,6 @@ function ovSave() {
   _ovSaveTimer = setTimeout(ovSaveConfig, 600);
 }
 
-// ── Goals / Milestones ───────────────────────────────────────────────────
-
-function ovGoalsBuild() {
-  return [
-    { text: "Synthesize phase-pure HOIP crystals",   status: "done",        deadline: "" },
-    { text: "PXRD characterization of all batches",  status: "in-progress", deadline: "" },
-    { text: "Magnetic measurements (PPMS-VSM)",      status: "in-progress", deadline: "" },
-    { text: "Transport measurements (PPMS-HC)",      status: "todo",        deadline: "" },
-    { text: "Write manuscript draft",                status: "todo",        deadline: "" },
-  ];
-}
-
-function ovSaveGoals() {
-  const rows = document.querySelectorAll("#ov-goals-tbody tr");
-  const goals = Array.from(rows).map((r) => ({
-    text:     r.querySelector(".ov-goal-text")?.value     || "",
-    status:   r.querySelector(".ov-goal-status")?.value   || "todo",
-    deadline: r.querySelector(".ov-goal-deadline")?.value || "",
-  }));
-  try {
-    const data = JSON.parse(localStorage.getItem(OV_KEY) || "{}");
-    data["ov-goals"] = goals;
-    localStorage.setItem(OV_KEY, JSON.stringify(data));
-  } catch (_) {}
-}
-
-function ovMakeGoalRow(g) {
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td><input class="ov-goal-inp ov-goal-text" value="${esc(g.text || "")}" placeholder="Milestone…" oninput="ovSaveGoals()"></td>
-    <td>
-      <select class="ov-goal-sel ov-goal-status" onchange="ovSaveGoals()">
-        <option value="todo"        ${g.status === "todo"        ? "selected" : ""}>📋 To Do</option>
-        <option value="in-progress" ${g.status === "in-progress" ? "selected" : ""}>🔄 In Progress</option>
-        <option value="done"        ${g.status === "done"        ? "selected" : ""}>✅ Done</option>
-        <option value="blocked"     ${g.status === "blocked"     ? "selected" : ""}>🚫 Blocked</option>
-      </select>
-    </td>
-    <td><input class="ov-goal-inp ov-goal-deadline" type="date" value="${esc(g.deadline || "")}" oninput="ovSaveGoals()"></td>
-    <td><button class="ov-goal-del auth-write" onclick="this.closest('tr').remove(); ovSaveGoals()" title="Remove">✕</button></td>
-  `;
-  return tr;
-}
-
-function ovRenderGoals(goals) {
-  const tbody = document.getElementById("ov-goals-tbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-  goals.forEach((g) => tbody.appendChild(ovMakeGoalRow(g)));
-}
-
-function ovAddGoal() {
-  const tbody = document.getElementById("ov-goals-tbody");
-  if (!tbody) return;
-  const row = ovMakeGoalRow({ text: "", status: "todo", deadline: "" });
-  tbody.appendChild(row);
-  ovSaveGoals();
-  row.querySelector(".ov-goal-text").focus();
-}
-
 // ── Live stats & charts ──────────────────────────────────────────────────
 
 async function ovLoadLive() {
@@ -205,10 +145,6 @@ async function ovShow() {
   if (descEl)  descEl.value  = config.description || "";
   ovDescAutoResize();
   _ovPpmsCompounds = config.compounds;
-
-  let stored = {};
-  try { stored = JSON.parse(localStorage.getItem(OV_KEY) || "{}"); } catch (_) {}
-  ovRenderGoals(stored["ov-goals"] || ovGoalsBuild());
 
   ovPpmsRender();
   ovLoadLive();
