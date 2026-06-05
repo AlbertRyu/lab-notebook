@@ -331,13 +331,22 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
 
         ftype = _file_type(f)
         auto_mode = None
+        external_field_oe = None
+        temperature_k = None
         if ftype == "data" and exp_type in {"ppms-vsm", "ppms-hc"}:
             try:
-                from parsers.ppms import parse_dat, detect_mode
+                from parsers.ppms import parse_dat, detect_mode, diagnostic_constants
                 df_data = parse_dat(str(f))
-                auto_mode = detect_mode(df_data) if df_data else None
+                if df_data:
+                    auto_mode = detect_mode(df_data)
+                    if exp_type == "ppms-vsm":
+                        constants = diagnostic_constants(df_data)
+                        external_field_oe = constants.get("external_field_oe")
+                        temperature_k = constants.get("temperature_k")
             except Exception:
                 auto_mode = None
+                external_field_oe = None
+                temperature_k = None
 
         session.add(DataFile(
             experiment_id=exp.id,
@@ -345,6 +354,8 @@ def _upsert_measurement(session: Session, folder: Path, meta: dict, added: dict)
             path=rel_path,
             file_type=ftype,
             auto_mode=auto_mode,
+            external_field_oe=external_field_oe,
+            temperature_k=temperature_k,
         ))
         added["files"] += 1
 

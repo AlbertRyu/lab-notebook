@@ -48,6 +48,8 @@ class DataFile(SQLModel, table=True):
     path: str  # relative to DATA_DIR
     file_type: str  # image | data | screenshot
     auto_mode: Optional[str] = Field(default=None)  # cached MT/MH/HC mode for PPMS files
+    external_field_oe: Optional[float] = Field(default=None)  # cached PPMS list label value
+    temperature_k: Optional[float] = Field(default=None)  # cached PPMS list label value
 
     experiment: Optional[Experiment] = Relationship(back_populates="files")
 

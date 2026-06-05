@@ -271,31 +271,53 @@ def _migrate_notes_table() -> None:
 
 
 def _migrate_datafile_table() -> None:
-    """Add auto_mode column to datafile table and backfill existing PPMS rows."""
+    """Add cached PPMS list columns and backfill existing PPMS rows."""
     with engine.connect() as conn:
         existing = {row[1] for row in conn.execute(text("PRAGMA table_info(datafile)"))}
-        if "auto_mode" not in existing:
-            conn.execute(text("ALTER TABLE datafile ADD COLUMN auto_mode VARCHAR"))
+        new_cols = {
+            "auto_mode": "VARCHAR",
+            "external_field_oe": "FLOAT",
+            "temperature_k": "FLOAT",
+        }
+        changed = False
+        for col, definition in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE datafile ADD COLUMN {col} {definition}"))
+                changed = True
+        if changed:
             conn.commit()
 
-    # Backfill: detect mode for PPMS data files that have auto_mode = NULL
+    # Backfill cached list values for PPMS data files missing any cache field.
     from sqlmodel import Session as _Session
-    from parsers.ppms import parse_dat, detect_mode
+    from parsers.ppms import parse_dat, detect_mode, diagnostic_constants
     with _Session(engine) as session:
         stmt = (
             select(DataFile, Experiment)
             .join(Experiment, DataFile.experiment_id == Experiment.id)
             .where(DataFile.file_type == "data")
-            .where(DataFile.auto_mode == None)  # noqa: E711
             .where(Experiment.type.in_(["ppms-vsm", "ppms-hc"]))
         )
         rows = session.exec(stmt).all()
         updated = 0
-        for df, _exp in rows:
+        for df, exp in rows:
+            needs_mode = df.auto_mode is None
+            needs_diagnostics = (
+                exp.type == "ppms-vsm"
+                and (df.external_field_oe is None or df.temperature_k is None)
+            )
+            if not needs_mode and not needs_diagnostics:
+                continue
             try:
                 abs_path = str(DATA_DIR_PATH / df.path)
                 parsed = parse_dat(abs_path)
-                df.auto_mode = detect_mode(parsed) if parsed else None
+                if not parsed:
+                    continue
+                if needs_mode:
+                    df.auto_mode = detect_mode(parsed)
+                if needs_diagnostics:
+                    constants = diagnostic_constants(parsed)
+                    df.external_field_oe = constants.get("external_field_oe")
+                    df.temperature_k = constants.get("temperature_k")
                 session.add(df)
                 updated += 1
             except Exception:
@@ -772,13 +794,22 @@ async def upload_file(
 
     rel_path = save_path.relative_to(DATA_DIR_PATH).as_posix()
     auto_mode = None
+    external_field_oe = None
+    temperature_k = None
     if file_type == "data" and exp.type in {"ppms-vsm", "ppms-hc"}:
         try:
-            from parsers.ppms import parse_dat, detect_mode
+            from parsers.ppms import parse_dat, detect_mode, diagnostic_constants
             df_data = parse_dat(str(save_path))
-            auto_mode = detect_mode(df_data) if df_data else None
+            if df_data:
+                auto_mode = detect_mode(df_data)
+                if exp.type == "ppms-vsm":
+                    constants = diagnostic_constants(df_data)
+                    external_field_oe = constants.get("external_field_oe")
+                    temperature_k = constants.get("temperature_k")
         except Exception:
             auto_mode = None
+            external_field_oe = None
+            temperature_k = None
 
     df = DataFile(
         experiment_id=exp_id,
@@ -786,6 +817,8 @@ async def upload_file(
         path=rel_path,
         file_type=file_type,
         auto_mode=auto_mode,
+        external_field_oe=external_field_oe,
+        temperature_k=temperature_k,
     )
     session.add(df)
     session.commit()
@@ -1147,16 +1180,6 @@ def list_files(
     out: list[FileWithContext] = []
 
     for f, exp, s in rows:
-        ppms_values: dict = {}
-        if exp.type == "ppms-vsm":
-            try:
-                from parsers.ppms import parse_dat, diagnostic_constants
-
-                parsed = parse_dat(str(DATA_DIR_PATH / f.path))
-                ppms_values = diagnostic_constants(parsed) if parsed else {}
-            except Exception:
-                ppms_values = {}
-
         out.append(
             FileWithContext(
                 id=f.id,
@@ -1171,8 +1194,8 @@ def list_files(
                 sample_name=s.name,
                 sample_compound=s.compound,
                 auto_mode=f.auto_mode,
-                external_field_oe=ppms_values.get("external_field_oe"),
-                temperature_k=ppms_values.get("temperature_k"),
+                external_field_oe=f.external_field_oe,
+                temperature_k=f.temperature_k,
             )
         )
 
