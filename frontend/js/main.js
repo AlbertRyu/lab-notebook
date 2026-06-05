@@ -282,7 +282,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "notes", "graph", "stock"];
+  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "stock"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))
@@ -307,5 +307,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   await invInit();
   ovShow();
   initResizers();
-  setTimeout(() => { void graphWarmup(); }, 0);
 });

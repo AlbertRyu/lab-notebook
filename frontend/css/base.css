@@ -120,6 +120,7 @@ body {
 }
 .nav-btn:hover { background: var(--row-hover); color: var(--fg); }
 .nav-btn.active { background: var(--row-selected); color: var(--accent); }
+.nav-btn[hidden] { display: none; }
 .nav-label {
   display: none;
   font-size: 12px;
