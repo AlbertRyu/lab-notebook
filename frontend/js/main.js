@@ -190,6 +190,7 @@ function drawPlotly(el, data) {
   const fg   = dark ? "#cccccc" : "#222222";
   const grid = dark ? "#444444" : "#e0e0e0";
   const filename = plotFilenameFromTitle(data.title);
+  const exportScale = 300 / 96;
   Plotly.react(el, data.traces, {
     paper_bgcolor: bg, plot_bgcolor: bg,
     showlegend: true, uirevision: "plot-ui",
@@ -205,7 +206,7 @@ function drawPlotly(el, data) {
     editable: false,
     displayModeBar: true,
     edits: { legendPosition: true },
-    toImageButtonOptions: { filename },
+    toImageButtonOptions: { filename, format: "png", scale: exportScale },
   });
 }
 
