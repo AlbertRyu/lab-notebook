@@ -191,15 +191,32 @@ function drawPlotly(el, data) {
   const grid = dark ? "#444444" : "#e0e0e0";
   const filename = plotFilenameFromTitle(data.title);
   const exportScale = 300 / 96;
+  const baseFontSize = 20;
   Plotly.react(el, data.traces, {
     paper_bgcolor: bg, plot_bgcolor: bg,
     showlegend: true, uirevision: "plot-ui",
-    font: { color: fg, family: "'Segoe UI', system-ui, Arial, sans-serif", size: 12 },
-    margin: { l: 85, r: 36, t: data.title ? 58 : 36, b: 72, pad: 8 },
-    title: data.title ? { text: data.title, font: { size: 14 } } : undefined,
-    xaxis: { title: data.xaxis, gridcolor: grid, linecolor: grid, zerolinecolor: grid },
-    yaxis: { title: data.yaxis, gridcolor: grid, linecolor: grid, zerolinecolor: grid },
-    legend: { x: 1, xanchor: "right", y: 1 },
+    font: { color: fg, family: "'Segoe UI', system-ui, Arial, sans-serif", size: baseFontSize },
+    margin: { l: 132, r: 54, t: data.title ? 88 : 52, b: 112, pad: 8 },
+    title: data.title ? { text: data.title, font: { size: 24 } } : undefined,
+    xaxis: {
+      title: { text: data.xaxis, font: { size: 22 } },
+      tickfont: { size: 19 },
+      gridcolor: grid,
+      linecolor: grid,
+      zerolinecolor: grid,
+      automargin: true,
+    },
+    yaxis: {
+      title: { text: data.yaxis, font: { size: 22 } },
+      tickfont: { size: 19 },
+      exponentformat: "e",
+      showexponent: "all",
+      gridcolor: grid,
+      linecolor: grid,
+      zerolinecolor: grid,
+      automargin: true,
+    },
+    legend: { x: 1, xanchor: "right", y: 1, font: { size: 19 } },
     hovermode: "closest",
   }, {
     responsive: true,
