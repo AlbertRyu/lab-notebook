@@ -49,10 +49,8 @@ from models import (
     DataFileRead,
     SampleFile,
     SampleFileRead,
-    Note,
-    NoteRead,
-    NoteCreate,
-    NoteUpdate,
+    NoteListItem,
+    NoteDetail,
     FileWithContext,
 )
 import scanner
@@ -84,12 +82,9 @@ async def _bg_scan_loop():
 async def lifespan(app: FastAPI):
     if not READ_ONLY_MODE:
         create_db()
-        _migrate_notes_table()
         _migrate_datafile_table()
         if AUTO_SCAN_ENABLED:
             _seed_if_empty()
-        with Session(engine) as s:
-            _sync_all_notes_from_db(s)
     task = (
         asyncio.create_task(_bg_scan_loop())
         if AUTO_SCAN_ENABLED and not READ_ONLY_MODE
@@ -250,24 +245,6 @@ def auth_login(data: AuthLogin, response: Response):
 def auth_logout(response: Response):
     response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
     return {"authenticated": False}
-
-
-def _migrate_notes_table() -> None:
-    """Add new columns to the note table if they don't exist yet."""
-    new_cols = {
-        "note_type": "VARCHAR DEFAULT 'discussion'",
-        "tags": "VARCHAR",
-        "status": "VARCHAR DEFAULT 'draft'",
-        "linked_sample_ids": "VARCHAR",
-        "log_date": "VARCHAR",
-        "next_steps": "VARCHAR",
-    }
-    with engine.connect() as conn:
-        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(note)"))}
-        for col, definition in new_cols.items():
-            if col not in existing:
-                conn.execute(text(f"ALTER TABLE note ADD COLUMN {col} {definition}"))
-        conn.commit()
 
 
 def _migrate_datafile_table() -> None:
@@ -1301,273 +1278,115 @@ def plot_files(
     return {"traces": traces, "xaxis": xaxis_title, "yaxis": yaxis_title, "title": title}
 
 
-# ── Notes ──────────────────────────────────────────────────────────────────
+# ── Notes (read-only viewer) ──────────────────────────────────────────────
+#
+# Notes are written in Obsidian and imported into /data/notes/ by
+# scripts/import-from-obsidian.py. This server only reads them — there are no
+# write endpoints. Each .md file may carry YAML frontmatter (title, date,
+# tags, pinned). The slug == filename without .md.
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _slugify(title: str) -> str:
-    """Convert title to a safe filename slug."""
-    # Remove special characters, replace spaces with hyphens
-    slug = re.sub(r'[^\w\s-]', '', title).strip().lower()
-    slug = re.sub(r'[\s-]+', '-', slug)
-    # Limit length to avoid too long filenames
-    return slug[:50] or 'untitled'
-
-
-def _note_filename(note: Note) -> Path:
-    """Generate filename for a note: {id}-{slug}.md."""
-    slug = _slugify(note.title)
-    return NOTES_DIR / f"{note.id}-{slug}.md"
-
-
-def _write_note_file(note: Note) -> None:
-    """Write note to markdown file with YAML frontmatter."""
-    NOTES_DIR.mkdir(parents=True, exist_ok=True)
-
-    created_at = note.created_at.isoformat() if note.created_at else ""
-    updated_at = note.updated_at.isoformat() if note.updated_at else ""
-    note_type = note.note_type or "discussion"
-
-    content = (
-        "---\n"
-        f"id: {note.id}\n"
-        f"title: {note.title}\n"
-        f"note_type: {note_type}\n"
-        f"pinned: {str(note.pinned).lower()}\n"
-        f"created_at: {created_at}\n"
-        f"updated_at: {updated_at}\n"
-    )
-    if note_type == "discussion":
-        content += f"tags: {note.tags or '[]'}\n"
-        content += f"status: {note.status or 'draft'}\n"
-    elif note_type == "daily_log":
-        content += f"log_date: {note.log_date or ''}\n"
-        if note.next_steps:
-            content += f"next_steps: {json.dumps(note.next_steps)}\n"
-    content += "---\n\n"
-    content += note.body or ""
-
-    # Delete any existing files matching this note id to avoid stale files
-    pattern = f"{note.id}-*.md"
-    for old_file in NOTES_DIR.glob(pattern):
-        if old_file.exists():
-            old_file.unlink()
-
-    filename = _note_filename(note)
-    filename.write_text(content, encoding="utf-8")
-
-
-def _delete_note_file(note_id: int) -> None:
-    """Delete markdown file for a deleted note."""
-    pattern = f"{note_id}-*.md"
-    for old_file in NOTES_DIR.glob(pattern):
-        if old_file.exists():
-            old_file.unlink()
-
-
-def _sync_all_notes_from_db(session: Session) -> None:
-    """Sync all existing notes from database to markdown files on startup."""
-    notes = session.exec(select(Note)).all()
-    for note in notes:
-        _write_note_file(note)
-
-
-@app.get("/api/notes", response_model=list[NoteRead])
-def list_notes(
-    q: Optional[str] = Query(None),
-    note_type: Optional[str] = Query(None),
-    tag: Optional[str] = Query(None),
-    session: Session = Depends(get_session),
-):
-    stmt = select(Note)
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(Note.title.like(like) | Note.body.like(like))
-    if note_type:
-        stmt = stmt.where(Note.note_type == note_type)
-    if tag:
-        stmt = stmt.where(Note.tags.contains(f'"{tag}"'))
-    # For daily_log: sort pinned first, then log_date descending (most recent first)
-    # For discussion: sort pinned first, then updated_at descending
-    if note_type == 'daily_log':
-        stmt = stmt.order_by(Note.pinned.desc(), Note.log_date.desc())
-    else:
-        stmt = stmt.order_by(Note.pinned.desc(), Note.updated_at.desc())
-    return session.exec(stmt).all()
-
-
-@app.post("/api/notes", response_model=NoteRead, status_code=201)
-def create_note(
-    data: NoteCreate,
-    _: None = Depends(require_write_auth),
-    session: Session = Depends(get_session),
-):
-    now = _now()
-    note = Note(
-        title=data.title,
-        body=data.body,
-        pinned=data.pinned,
-        note_type=data.note_type,
-        tags=data.tags,
-        status=data.status,
-        linked_sample_ids=data.linked_sample_ids,
-        log_date=data.log_date,
-        next_steps=data.next_steps,
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(note)
-    session.commit()
-    session.refresh(note)
-    _write_note_file(note)
-    return note
-
-
-@app.get("/api/notes/{note_id}", response_model=NoteRead)
-def get_note(note_id: int, session: Session = Depends(get_session)):
-    note = session.get(Note, note_id)
-    if not note:
-        raise HTTPException(404, "Note not found")
-    return note
-
-
-@app.put("/api/notes/{note_id}", response_model=NoteRead)
-def update_note(
-    note_id: int,
-    data: NoteUpdate,
-    _: None = Depends(require_write_auth),
-    session: Session = Depends(get_session),
-):
-    note = session.get(Note, note_id)
-    if not note:
-        raise HTTPException(404, "Note not found")
-    if data.title is not None:
-        note.title = data.title
-    if data.body is not None:
-        note.body = data.body
-    if data.pinned is not None:
-        note.pinned = data.pinned
-    if data.note_type is not None:
-        note.note_type = data.note_type
-    if data.tags is not None:
-        note.tags = data.tags
-    if data.status is not None:
-        note.status = data.status
-    if data.linked_sample_ids is not None:
-        note.linked_sample_ids = data.linked_sample_ids
-    if data.log_date is not None:
-        note.log_date = data.log_date
-    if data.next_steps is not None:
-        note.next_steps = data.next_steps
-    note.updated_at = _now()
-    session.add(note)
-    session.commit()
-    session.refresh(note)
-    _write_note_file(note)
-    return note
-
-
-def _parse_yaml_frontmatter(content: str) -> tuple[dict, str]:
-    """Parse YAML frontmatter from markdown content. Returns (frontmatter_dict, body_content)."""
-    if not content.startswith('---\n'):
-        return {}, content
-
-    # Find the closing ---
-    end_idx = content.find('\n---\n', 4)
-    if end_idx == -1:
-        return {}, content
-
+def _read_note_file(path: Path) -> tuple[dict, str]:
+    """Return (frontmatter, body) for a markdown file."""
+    raw = path.read_text(encoding="utf-8")
+    if not raw.startswith("---\n"):
+        return {}, raw
+    end = raw.find("\n---\n", 4)
+    if end == -1:
+        return {}, raw
     try:
-        import yaml
-        frontmatter = yaml.safe_load(content[4:end_idx]) or {}
-        body = content[end_idx + 5:].lstrip()
-        return frontmatter, body
+        fm = yaml.safe_load(raw[4:end]) or {}
     except Exception:
-        # If YAML parsing fails, treat everything as body
-        return {}, content
+        return {}, raw
+    if not isinstance(fm, dict):
+        fm = {}
+    return fm, raw[end + 5:].lstrip("\n")
 
 
-@app.post("/api/notes/upload", response_model=NoteRead, status_code=201)
-async def upload_note(
-    file: UploadFile = FastAPIFile(...),
-    _: None = Depends(require_write_auth),
-    session: Session = Depends(get_session),
-):
-    """Upload a Markdown file as a new note. Supports YAML frontmatter."""
+def _note_meta(path: Path) -> dict:
+    fm, body = _read_note_file(path)
+    slug = path.stem
+    title = fm.get("title") or slug
+    date = fm.get("date") or fm.get("updated_at") or fm.get("created_at") or ""
+    if not isinstance(date, str):
+        date = str(date)
+    tags = fm.get("tags") or []
+    if isinstance(tags, str):
+        s = tags.strip()
+        if s.startswith("[") and s.endswith("]"):
+            try:
+                parsed = json.loads(s)
+                tags = parsed if isinstance(parsed, list) else []
+            except Exception:
+                tags = []
+        else:
+            tags = [t.strip() for t in s.split(",") if t.strip()]
+    elif not isinstance(tags, list):
+        tags = []
+    pinned = bool(fm.get("pinned", False))
+    return {
+        "slug": slug,
+        "title": str(title),
+        "date": date,
+        "tags": [str(t) for t in tags],
+        "pinned": pinned,
+        "body": body,
+        "_mtime": path.stat().st_mtime,
+    }
 
-    # Validate file extension
-    if not file.filename or not file.filename.lower().endswith('.md'):
-        raise HTTPException(400, "Only Markdown files (.md) are accepted")
 
-    # Read file content
-    content_bytes = await file.read()
+@app.get("/api/notes", response_model=list[NoteListItem])
+def list_notes(q: Optional[str] = Query(None)):
+    if not NOTES_DIR.exists():
+        return []
+    items = []
+    needle = q.lower().strip() if q else ""
+    for path in NOTES_DIR.glob("*.md"):
+        try:
+            meta = _note_meta(path)
+        except Exception:
+            continue
+        if needle:
+            haystack = " ".join([meta["title"], meta["body"], " ".join(meta["tags"])]).lower()
+            if needle not in haystack:
+                continue
+        preview = re.sub(r"\s+", " ", meta["body"]).strip()[:120]
+        items.append({
+            "slug": meta["slug"],
+            "title": meta["title"],
+            "date": meta["date"],
+            "tags": meta["tags"],
+            "pinned": meta["pinned"],
+            "preview": preview,
+            "_sort": _date_sort_key(meta["date"]) or meta["_mtime"],
+        })
+    items.sort(key=lambda n: (not n["pinned"], -n["_sort"]))
+    for it in items:
+        it.pop("_sort", None)
+    return items
+
+
+def _date_sort_key(date_str: str) -> float:
+    """Best-effort numeric key for descending sort. Bigger = newer."""
+    if not date_str:
+        return 0.0
     try:
-        content = content_bytes.decode('utf-8')
-    except UnicodeDecodeError:
-        raise HTTPException(400, "File must be UTF-8 encoded text")
-
-    # Parse YAML frontmatter
-    frontmatter, body = _parse_yaml_frontmatter(content)
-
-    # Extract metadata from frontmatter or use defaults
-    title = frontmatter.get('title', file.filename[:-3] if file.filename else 'Untitled')
-    note_type = frontmatter.get('note_type', 'discussion')
-    pinned = bool(frontmatter.get('pinned', False))
-    status = frontmatter.get('status', 'draft')
-    tags = frontmatter.get('tags')
-    log_date = frontmatter.get('log_date')
-    next_steps = frontmatter.get('next_steps')
-
-    # Validate note_type
-    if note_type not in ['discussion', 'daily_log']:
-        note_type = 'discussion'
-
-    # Handle tags - if it's a list, convert to JSON string
-    if tags is not None and isinstance(tags, list):
-        tags = json.dumps(tags)
-    elif tags is not None and not isinstance(tags, str):
-        tags = None
-
-    # Handle next_steps - if it's a multi-line string in YAML, it will already be a string
-    if next_steps is not None and not isinstance(next_steps, str):
-        next_steps = str(next_steps) if next_steps else None
-
-    # Create note
-    now = _now()
-    note = Note(
-        title=title,
-        body=body,
-        pinned=pinned,
-        note_type=note_type,
-        tags=tags,
-        status=status,
-        log_date=log_date,
-        next_steps=next_steps,
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(note)
-    session.commit()
-    session.refresh(note)
-
-    # Write the markdown file (using existing sync logic)
-    _write_note_file(note)
-
-    return note
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        pass
+    try:
+        return datetime.strptime(date_str[:10], "%Y-%m-%d").timestamp()
+    except Exception:
+        return 0.0
 
 
-@app.delete("/api/notes/{note_id}", status_code=204)
-def delete_note(
-    note_id: int,
-    _: None = Depends(require_write_auth),
-    session: Session = Depends(get_session),
-):
-    note = session.get(Note, note_id)
-    if not note:
+@app.get("/api/notes/{slug}", response_model=NoteDetail)
+def get_note(slug: str):
+    if "/" in slug or "\\" in slug or slug.startswith("."):
+        raise HTTPException(400, "Invalid slug")
+    path = NOTES_DIR / f"{slug}.md"
+    if not path.exists() or not path.is_file():
         raise HTTPException(404, "Note not found")
-    session.delete(note)
-    session.commit()
-    _delete_note_file(note_id)
+    meta = _note_meta(path)
+    meta.pop("_mtime", None)
+    return meta

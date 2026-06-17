@@ -34,8 +34,8 @@
         <button class="nav-btn"        id="nav-inventory"     title="Sample Registry"    onclick="showPage('inventory')">📋<span class="nav-label">Samples</span></button>
         <button class="nav-btn"        id="nav-boxes"         title="Sample Boxes"       onclick="showPage('boxes')">📦<span class="nav-label">Sample Boxes</span></button>
         <button class="nav-btn"        id="nav-viz"           title="Data Visualization" onclick="showPage('viz')">📈<span class="nav-label">Visualization</span></button>
-        <!-- Notes and graph are temporarily hidden from the UI. -->
-        <button class="nav-btn"        id="nav-notes"         title="Notes"              onclick="showPage('notes')" hidden>📝<span class="nav-label">Notes</span></button>
+        <button class="nav-btn"        id="nav-notes"         title="Notes"              onclick="showPage('notes')">📝<span class="nav-label">Notes</span></button>
+        <!-- Graph tab is intentionally hidden from the UI. -->
         <button class="nav-btn"        id="nav-graph"         title="Entity Graph"       onclick="showPage('graph')" hidden>🕸️<span class="nav-label">Entity Graph</span></button>
         <div class="spacer"></div>
         <button class="nav-btn nav-toggle" title="Expand sidebar" onclick="toggleNav()">›</button>
@@ -55,9 +55,6 @@
       <button id="lightbox-close" onclick="closeLightbox()">✕</button>
       <img id="lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
     </div>
-
-    <!-- @mention dropdown -->
-    <div id="mention-dropdown"></div>
 
     <!-- Modal -->
     <div id="modal-overlay" onclick="closeModal(event)">

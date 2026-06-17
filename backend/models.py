@@ -117,61 +117,25 @@ class ExperimentCreate(SQLModel):
     mass: Optional[float] = None
 
 
-# ── Notes ──────────────────────────────────────────────────────────────────
+# ── Notes (read-only viewer; backed by /data/notes/*.md, no DB table) ─────
 
 
-class Note(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+class NoteListItem(SQLModel):
+    slug: str
     title: str
-    body: str = Field(default="")
-    pinned: bool = Field(default=False)
-    created_at: Optional[Datetime] = Field(default=None)
-    updated_at: Optional[Datetime] = Field(default=None)
-    note_type: str = Field(default="discussion")
-    tags: Optional[str] = Field(default=None)           # JSON array of strings
-    status: Optional[str] = Field(default="draft")
-    linked_sample_ids: Optional[str] = Field(default=None)  # JSON array of ints
-    log_date: Optional[str] = Field(default=None)        # "YYYY-MM-DD"
-    next_steps: Optional[str] = Field(default=None)
-
-
-class NoteRead(SQLModel):
-    id: int
-    title: str
-    body: str
+    date: str = ""
+    tags: List[str] = []
     pinned: bool = False
-    created_at: Optional[Datetime]
-    updated_at: Optional[Datetime]
-    note_type: str = "discussion"
-    tags: Optional[str] = None
-    status: Optional[str] = "draft"
-    linked_sample_ids: Optional[str] = None
-    log_date: Optional[str] = None
-    next_steps: Optional[str] = None
+    preview: str = ""
 
 
-class NoteCreate(SQLModel):
+class NoteDetail(SQLModel):
+    slug: str
     title: str
+    date: str = ""
+    tags: List[str] = []
+    pinned: bool = False
     body: str = ""
-    pinned: bool = False
-    note_type: str = "discussion"
-    tags: Optional[str] = None
-    status: Optional[str] = "draft"
-    linked_sample_ids: Optional[str] = None
-    log_date: Optional[str] = None
-    next_steps: Optional[str] = None
-
-
-class NoteUpdate(SQLModel):
-    title: Optional[str] = None
-    body: Optional[str] = None
-    pinned: Optional[bool] = None
-    note_type: Optional[str] = None
-    tags: Optional[str] = None
-    status: Optional[str] = None
-    linked_sample_ids: Optional[str] = None
-    log_date: Optional[str] = None
-    next_steps: Optional[str] = None
 
 
 # ── Cross-sample file listing ──────────────────────────────────────────────

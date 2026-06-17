@@ -61,8 +61,6 @@ function applyAuthUi() {
     "inv-add-sample-btn", "inv-scan-btn", "inv-import-btn",
     "detail-add-exp-btn", "detail-edit-sample-btn", "detail-delete-sample-btn",
     "prep-add-sample-btn", "prep-detail-add-exp-btn", "prep-detail-edit-btn", "prep-detail-delete-btn",
-    "notes-add-btn", "note-save-btn", "note-pin-btn", "note-delete-btn",
-    "note-title-input", "note-body",
     "bx-add-btn",
     "stk-add-btn",
   ].forEach((id) => {
@@ -70,10 +68,6 @@ function applyAuthUi() {
     if (el) el.disabled = auth.readOnly || !auth.authenticated;
   });
 
-  const noteTabEdit = document.getElementById("note-tab-edit");
-  if (noteTabEdit) noteTabEdit.style.display = auth.authenticated && !auth.readOnly ? "" : "none";
-
-  if (notes.current) noteSetTab(auth.authenticated && !auth.readOnly ? "edit" : "preview");
   bxApplyAuth();
 }
 
@@ -168,7 +162,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeLightbox();
     closeModal();
-    mentionHide();
   }
 });
 
@@ -313,7 +306,7 @@ function initResizers() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadTabs() {
-  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "stock"];
+  const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "stock", "notes"];
   const pages = document.getElementById("pages");
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))

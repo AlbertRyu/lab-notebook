@@ -11,20 +11,16 @@ def create_db():
     import models  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
-    _migrate_note_pinned_column()
+    _drop_note_table()
     _migrate_experiment_source_path()
 
 
-def _migrate_note_pinned_column():
-    """Add note.pinned for existing databases created before this field existed."""
+def _drop_note_table():
+    """The note table was retired when notes moved to filesystem-only storage.
+    Drop it from any pre-existing database so it doesn't show up in tooling."""
     with engine.connect() as conn:
-        cols = conn.execute(text("PRAGMA table_info(note)")).fetchall()
-        col_names = {row[1] for row in cols}
-        if "pinned" not in col_names:
-            conn.execute(
-                text("ALTER TABLE note ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT 0")
-            )
-            conn.commit()
+        conn.execute(text("DROP TABLE IF EXISTS note"))
+        conn.commit()
 
 
 def _migrate_experiment_source_path():
