@@ -229,7 +229,12 @@ def _auth_required_response(request: Request):
 @app.middleware("http")
 async def require_site_auth(request: Request, call_next):
     path = request.url.path
-    if path in AUTH_EXEMPT_PATHS or path.startswith("/static/css/") or path.startswith("/static/js/"):
+    if (
+        path in AUTH_EXEMPT_PATHS
+        or path.startswith("/static/css/")
+        or path.startswith("/static/js/")
+        or path.startswith("/static/tabs/")
+    ):
         return await call_next(request)
     if _is_authenticated(request):
         return await call_next(request)
