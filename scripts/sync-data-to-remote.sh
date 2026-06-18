@@ -53,6 +53,29 @@ ssh "$REMOTE" "cd '$REMOTE_COMPOSE_DIR' && $REMOTE_COMPOSE_ENV $REMOTE_COMPOSE_C
 echo "Ensuring remote data directory exists..."
 ssh "$REMOTE" "mkdir -p '$REMOTE_DATA_DIR'"
 
+echo "Previewing remote file changes..."
+CHANGE_LIST="$(rsync -azn --delete --itemize-changes --out-format='%i %n' "$SNAPSHOT_DIR"/ "$REMOTE:$REMOTE_DATA_DIR"/)"
+if [[ -z "$CHANGE_LIST" ]]; then
+  echo "No file changes detected."
+else
+  UPDATED_FILES="$(printf '%s\n' "$CHANGE_LIST" | grep -E '^[^*].*[fcLDS].* ' | grep -v '^>f+++++++++ ' || true)"
+  ADDED_FILES="$(printf '%s\n' "$CHANGE_LIST" | grep '^>f+++++++++ ' || true)"
+  DELETED_FILES="$(printf '%s\n' "$CHANGE_LIST" | grep '^\*deleting ' || true)"
+
+  if [[ -n "$UPDATED_FILES" ]]; then
+    echo "Changed files:"
+    printf '%s\n' "$UPDATED_FILES" | sed -E 's/^[^ ]+ /  /'
+  fi
+  if [[ -n "$ADDED_FILES" ]]; then
+    echo "New files:"
+    printf '%s\n' "$ADDED_FILES" | sed -E 's/^[^ ]+ /  /'
+  fi
+  if [[ -n "$DELETED_FILES" ]]; then
+    echo "Deleted files:"
+    printf '%s\n' "$DELETED_FILES" | sed -E 's/^\*deleting /  /'
+  fi
+fi
+
 echo "Syncing snapshot to remote..."
 rsync -az --delete --delay-updates "$SNAPSHOT_DIR"/ "$REMOTE:$REMOTE_DATA_DIR"/
 

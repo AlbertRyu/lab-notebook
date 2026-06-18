@@ -159,14 +159,16 @@ def process_note(
 
 
 def main() -> int:
+    repo_root = Path(__file__).resolve().parent.parent
     p = argparse.ArgumentParser(
         description="Import Obsidian markdown notes into lab-notebook /data/notes/."
     )
-    p.add_argument("--vault", required=True, type=Path, help="Path to the Obsidian vault root")
-    p.add_argument("--folder", required=True, help="Subfolder inside the vault to publish (e.g. 'Lab')")
-    p.add_argument("--attachments", required=True, help="Attachments folder name relative to vault root (e.g. 'attachments')")
-    p.add_argument("--out", required=True, type=Path, help="Output dir, normally <repo>/data/notes")
-    p.add_argument("--clean", action="store_true", help="Wipe out/*.md and out/assets/ before importing")
+    p.add_argument("--vault", default=Path("~/SyncDokumente/MasterThesisVault"), type=Path, help="Path to the Obsidian vault root")
+    p.add_argument("--folder", default="05_writing", help="Subfolder inside the vault to publish")
+    p.add_argument("--attachments", default="assets", help="Attachments folder name relative to vault root")
+    p.add_argument("--out", default=repo_root / "data" / "notes", type=Path, help="Output dir")
+    p.add_argument("--clean", dest="clean", action="store_true", default=True, help="Wipe out/*.md and out/assets/ before importing")
+    p.add_argument("--no-clean", dest="clean", action="store_false", help="Keep existing output files before importing")
     args = p.parse_args()
 
     vault: Path = args.vault.expanduser().resolve()
