@@ -116,7 +116,7 @@ function initSiteAuthForm() {
       input.value = "";
       if (!_appLoaded) await loadApp();
     } catch (_) {
-      error.textContent = "Invalid password.";
+      error.textContent = "Name not recognized.";
       input.select();
     }
   });

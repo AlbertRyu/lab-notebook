@@ -211,6 +211,11 @@ def require_write_auth(request: Request):
         raise HTTPException(401, "Authentication required for write operations")
 
 
+def _allowed_first_names() -> set[str]:
+    raw = os.environ.get("LAB_NOTEBOOK_ALLOWED_FIRST_NAMES", "")
+    return {name.strip().casefold() for name in raw.split(",") if name.strip()}
+
+
 def _auth_password() -> str:
     return os.environ.get("LAB_NOTEBOOK_PASSWORD", "")
 
@@ -244,12 +249,18 @@ def auth_me(request: Request):
 
 @app.post("/api/auth/login")
 def auth_login(data: AuthLogin, response: Response):
-    configured_password = _auth_password()
-    if not configured_password:
-        raise HTTPException(503, "LAB_NOTEBOOK_PASSWORD is not configured")
+    allowed_first_names = _allowed_first_names()
+    submitted = data.password.strip()
 
-    if not hmac.compare_digest(data.password, configured_password):
-        raise HTTPException(401, "Invalid password")
+    if allowed_first_names:
+        if submitted.casefold() not in allowed_first_names:
+            raise HTTPException(401, "Invalid first name")
+    else:
+        configured_password = _auth_password()
+        if not configured_password:
+            raise HTTPException(503, "LAB_NOTEBOOK_PASSWORD is not configured")
+        if not hmac.compare_digest(submitted, configured_password):
+            raise HTTPException(401, "Invalid password")
 
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
