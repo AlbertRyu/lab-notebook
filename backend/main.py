@@ -29,7 +29,7 @@ from fastapi import (
     UploadFile,
     File as FastAPIFile,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -135,6 +135,11 @@ def _get_scan_roots() -> list[Path]:
 AUTH_COOKIE_NAME = "lab_notebook_auth"
 AUTH_TTL_SECONDS = int(os.environ.get("AUTH_TTL_SECONDS", "28800"))  # 8 hours
 AUTH_COOKIE_SECURE = os.environ.get("AUTH_COOKIE_SECURE", "false").lower() == "true"
+AUTH_EXEMPT_PATHS = {
+    "/api/auth/me",
+    "/api/auth/login",
+    "/static/favicon.svg",
+}
 
 
 class AuthLogin(BaseModel):
@@ -206,23 +211,40 @@ def require_write_auth(request: Request):
         raise HTTPException(401, "Authentication required for write operations")
 
 
+def _auth_password() -> str:
+    return os.environ.get("LAB_NOTEBOOK_PASSWORD", "")
+
+
+def _auth_required_response(request: Request):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.middleware("http")
+async def require_site_auth(request: Request, call_next):
+    path = request.url.path
+    if path in AUTH_EXEMPT_PATHS or path.startswith("/static/css/") or path.startswith("/static/js/"):
+        return await call_next(request)
+    if _is_authenticated(request):
+        return await call_next(request)
+    return _auth_required_response(request)
+
+
 SEED_DIR = Path(__file__).parent.parent / "seed"
 
 
 @app.get("/api/auth/me")
 def auth_me(request: Request):
     return {
-        "authenticated": _is_authenticated(request) and not READ_ONLY_MODE,
+        "authenticated": _is_authenticated(request),
         "read_only": READ_ONLY_MODE,
     }
 
 
 @app.post("/api/auth/login")
 def auth_login(data: AuthLogin, response: Response):
-    if READ_ONLY_MODE:
-        raise HTTPException(403, "This instance is read-only")
-
-    configured_password = os.environ.get("LAB_NOTEBOOK_PASSWORD", "")
+    configured_password = _auth_password()
     if not configured_password:
         raise HTTPException(503, "LAB_NOTEBOOK_PASSWORD is not configured")
 
@@ -238,7 +260,7 @@ def auth_login(data: AuthLogin, response: Response):
         secure=AUTH_COOKIE_SECURE,
         path="/",
     )
-    return {"authenticated": True}
+    return {"authenticated": True, "read_only": READ_ONLY_MODE}
 
 
 @app.post("/api/auth/logout")

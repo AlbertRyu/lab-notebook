@@ -72,4 +72,16 @@
 #note-render th, #note-render td { border: 1px solid var(--border-strong); padding: 5px 10px; text-align: left; }
 #note-render th { background: var(--bg-header); font-weight: 600; }
 #note-render hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
-#note-render img { max-width: 100%; height: auto; display: block; margin: 0.75em 0; cursor: zoom-in; }
+#note-render img {
+  max-width: min(100%, 720px);
+  max-height: min(55vh, 520px);
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  margin: 0.9em auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  cursor: zoom-in;
+}

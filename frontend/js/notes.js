@@ -92,4 +92,8 @@ function notesRenderView() {
     a.classList.add("note-link");
     a.addEventListener("click", (ev) => { ev.preventDefault(); notesSelect(target); });
   });
+
+  render.querySelectorAll("img").forEach((img) => {
+    img.addEventListener("click", () => openLightbox(img.currentSrc || img.src, img.alt || ""));
+  });
 }

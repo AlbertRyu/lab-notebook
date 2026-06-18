@@ -50,10 +50,12 @@ async function authInit() {
 }
 
 function applyAuthUi() {
+  document.body.classList.toggle("auth-pending", false);
+  document.body.classList.toggle("auth-required", !auth.authenticated);
   const lockBtn = document.getElementById("nav-auth");
   if (lockBtn) {
-    lockBtn.textContent = auth.readOnly ? "RO" : (auth.authenticated ? "🔓" : "🔒");
-    lockBtn.title = auth.readOnly ? "Read-only instance" : "Unlock editing";
+    lockBtn.textContent = auth.readOnly ? "RO" : "🔓";
+    lockBtn.title = auth.readOnly ? "Read-only instance; click to log out" : "Log out";
   }
   document.body.classList.toggle("readonly", auth.readOnly || !auth.authenticated);
 
@@ -76,37 +78,21 @@ function ensureWriteAuth() {
     alert("This instance is read-only. Edit on the local primary instance.");
     return false;
   }
-  if (auth.authenticated) return true;
-  alert("Read-only mode. Please unlock editing with password first.");
-  openAuthModal();
-  return false;
+  return true;
 }
 
 function openAuthModal() {
-  if (auth.readOnly) {
-    alert("This instance is read-only. Edit on the local primary instance.");
-    return;
-  }
-  if (auth.authenticated) { authLogout(); return; }
-  modalOpen("Unlock Editing", `
-    <div class="form-row">
-      <label>Password</label>
-      <input id="auth-password" type="password" placeholder="Enter password" autocomplete="current-password">
-    </div>
-  `, async () => {
-    const password = document.getElementById("auth-password").value;
-    await authLogin(password);
-    closeModal();
-  });
+  authLogout();
 }
 
 async function authLogin(password) {
-  await api("/api/auth/login", {
+  const me = await api("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
   });
   auth.authenticated = true;
+  auth.readOnly = !!me.read_only;
   applyAuthUi();
 }
 
@@ -114,6 +100,26 @@ async function authLogout() {
   await api("/api/auth/logout", { method: "POST" });
   auth.authenticated = false;
   applyAuthUi();
+  document.getElementById("site-auth-password")?.focus();
+}
+
+function initSiteAuthForm() {
+  const form = document.getElementById("site-auth-form");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("site-auth-password");
+    const error = document.getElementById("site-auth-error");
+    error.textContent = "";
+    try {
+      await authLogin(input.value);
+      input.value = "";
+      if (!_appLoaded) await loadApp();
+    } catch (_) {
+      error.textContent = "Invalid password.";
+      input.select();
+    }
+  });
 }
 
 function esc(s) {
@@ -308,6 +314,7 @@ function initResizers() {
 async function loadTabs() {
   const tabs = ["overview", "boxes", "preparations", "inventory", "viz", "stock", "notes"];
   const pages = document.getElementById("pages");
+  if (pages.children.length) return;
   const htmls = await Promise.all(
     tabs.map((t) => fetch(`/static/tabs/${t}.html`).then((r) => r.text()))
   );
@@ -319,7 +326,9 @@ async function loadTabs() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+let _appLoaded = false;
+async function loadApp() {
+  if (_appLoaded) return;
   if (localStorage.getItem("nav-expanded") === "1") {
     document.getElementById("nav").classList.add("expanded");
     const btn = document.querySelector(".nav-toggle");
@@ -327,8 +336,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.title = "Collapse sidebar";
   }
   await loadTabs();
-  await authInit();
   await invInit();
   ovShow();
   initResizers();
+  _appLoaded = true;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  initSiteAuthForm();
+  await authInit();
+  if (auth.authenticated) await loadApp();
+  else document.getElementById("site-auth-password")?.focus();
 });

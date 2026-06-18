@@ -64,6 +64,67 @@ body {
   color: var(--fg);
 }
 
+/* ── Site auth ── */
+#site-auth {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 18%, transparent), transparent 32rem),
+    var(--bg);
+}
+body.auth-pending #app,
+body.auth-required #app {
+  display: none;
+}
+body.auth-required #site-auth {
+  display: flex;
+}
+.site-auth-card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+.site-auth-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 800;
+}
+.site-auth-card h1 {
+  font-size: 24px;
+  line-height: 1.15;
+}
+.site-auth-card p {
+  color: var(--fg-dim);
+  margin-bottom: 4px;
+}
+.site-auth-card input,
+.site-auth-card button {
+  width: 100%;
+  height: 38px;
+  font-size: 14px;
+}
+#site-auth-error {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
 /* ── App shell ── */
 #app {
   display: flex;

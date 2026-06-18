@@ -5,6 +5,7 @@ __pycache__/
 .env
 docker-compose.override.yml
 .claude/
+backups/
 example_data/
 
 # macOS
