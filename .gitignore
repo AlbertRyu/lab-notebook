@@ -7,6 +7,7 @@ docker-compose.override.yml
 .claude/
 backups/
 example_data/
+scripts/.restic.env
 
 # macOS
 .DS_Store

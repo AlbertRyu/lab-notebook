@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lab-notebook.backup</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/yunxiao/Documents/lab-notebook/scripts/backup-to-b2.sh</string>
+  </array>
+
+  <!-- Run daily at 02:30 local time. If the Mac is asleep at that moment,
+       launchd runs the job once the machine wakes up. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>2</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+
+  <!-- Don't run immediately when loaded; wait for the calendar interval. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <!-- Retry once if the script exits non-zero. -->
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <true/>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/yunxiao/Documents/lab-notebook/backups/backup.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/yunxiao/Documents/lab-notebook/backups/backup.err.log</string>
+
+  <!-- Run at low priority so it doesn't compete with interactive work. -->
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
